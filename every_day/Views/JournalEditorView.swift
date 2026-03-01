@@ -32,10 +32,23 @@ struct JournalEditorView: View {
 
     @State private var vm = JournalViewModel()
 
+    @AppStorage("showMoodMeter") private var showMoodMeter = true
+    @State private var showDiscardAlert = false
+
     // MARK: - Computed
 
     private var isEditing: Bool { entry != nil }
     private var canSave: Bool   { !entryBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private var hasChanges: Bool {
+        if let e = entry {
+            return title != e.title || entryBody != e.body ||
+                   hasMoodSelection != e.hasMoodSelection ||
+                   moodX != e.moodX || moodY != e.moodY
+        }
+        return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+               !entryBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     // MARK: - Body
 
@@ -78,20 +91,22 @@ struct JournalEditorView: View {
                                 .font(.body)
                                 .foregroundStyle(.white)
                                 .scrollContentBackground(.hidden)
-                                .frame(minHeight: 150)
+                                .frame(minHeight: 90)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 10)
                                 .background(fieldBackground)
                         }
 
-                        // ── Mood Meter ──────────────────────────────────────
-                        VStack(alignment: .leading, spacing: 10) {
-                            fieldLabel("Mood Meter")
-                            MoodMeterView(
-                                moodX: $moodX,
-                                moodY: $moodY,
-                                hasSelection: $hasMoodSelection
-                            )
+                        // ── Mood Meter (hidden when user disables in Settings) ──
+                        if showMoodMeter {
+                            VStack(alignment: .leading, spacing: 10) {
+                                fieldLabel("Mood Meter")
+                                MoodMeterView(
+                                    moodX: $moodX,
+                                    moodY: $moodY,
+                                    hasSelection: $hasMoodSelection
+                                )
+                            }
                         }
 
                         // ── Last edited footer ──────────────────────────────
@@ -107,14 +122,29 @@ struct JournalEditorView: View {
                     .padding(.top, 12)
                 }
                 .scrollDismissesKeyboard(.interactively)
+
+                // ── Scroll fade gradient (Option G) ────────────────────────
+                // Signals more content below without any interaction overhead.
+                VStack {
+                    Spacer()
+                    LinearGradient(
+                        colors: [.clear, Color.orbitBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 70)
+                }
+                .allowsHitTesting(false)
             }
             .navigationTitle(isEditing ? "Edit Entry" : "New Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(.white.opacity(0.7))
+                    Button("Cancel") {
+                        if hasChanges { showDiscardAlert = true } else { dismiss() }
+                    }
+                    .foregroundStyle(.white.opacity(0.7))
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
@@ -124,6 +154,12 @@ struct JournalEditorView: View {
                 }
             }
             .onAppear(perform: loadEntry)
+            .alert("Discard Changes?", isPresented: $showDiscardAlert) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("Your unsaved changes will be lost.")
+            }
         }
     }
 

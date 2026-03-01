@@ -61,4 +61,16 @@ enum HoroscopeCache {
         defaults.set(horoscope,   forKey: textKey(for: sign))
         defaults.set(todayString, forKey: dateKey(for: sign))
     }
+
+    /// Removes all cached data for a sign, forcing a fresh API call on next fetch.
+    static func clearCache(for sign: ZodiacSign) {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: textKey(for: sign))
+        defaults.removeObject(forKey: dateKey(for: sign))
+    }
+
+    /// Removes cached data for every zodiac sign.
+    static func clearAllCaches() {
+        ZodiacSign.allCases.forEach { clearCache(for: $0) }
+    }
 }

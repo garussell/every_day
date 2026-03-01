@@ -6,11 +6,12 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var dashboardVM = DashboardViewModel()
+    @State private var dashboardVM  = DashboardViewModel()
+    @State private var settingsVM   = SettingsViewModel()
 
     var body: some View {
         TabView {
-            DashboardView(viewModel: dashboardVM)
+            DashboardView(viewModel: dashboardVM, settingsVM: settingsVM)
                 .tabItem {
                     Label("Today", systemImage: "sparkles")
                 }

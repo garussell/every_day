@@ -5,27 +5,42 @@
 //  Uses the API Ninjas Horoscope endpoint.
 //  Docs: https://api-ninjas.com/api/horoscope
 //
+//  API KEY SETUP
+//  -------------
+//  The key is stored exclusively in the iOS Keychain — it is never hardcoded
+//  in source. Call HoroscopeService.updateAPIKey("your-key") once at app
+//  startup (e.g. from every_dayApp.init()) in a file that is excluded from
+//  version control (e.g. add "Secrets.swift" to .gitignore).
+//
+//  Example Secrets.swift (gitignored):
+//
+//      import Foundation
+//      enum Secrets {
+//          static func bootstrap() {
+//              HoroscopeService.updateAPIKey("your-api-ninjas-key-here")
+//          }
+//      }
+//
+//  Then in every_dayApp.init(): Secrets.bootstrap()
+//
 
 import Foundation
 
 struct HoroscopeService {
 
     // MARK: - API Key
-    // Your API Ninjas key. Every time this constant changes it is automatically
-    // re-synced to the iOS Keychain, so stale Keychain values can never hide a
-    // key update.
-    private static let keyPlaceholder  = "E6vaMkcY6LuS4vm7oHG42Q==0mxjBNmM78DC4kYT"
+
     private static let keychainAccount = "apininjas_horoscope_key"
 
-    /// Always writes the current hardcoded key to Keychain so updates are
-    /// never silently ignored by a stale cached value.
+    /// Reads the API key from the Keychain. Returns an empty string if not set,
+    /// which will cause the request to fail with a 401 — surfaced as a user-facing
+    /// error via the existing error-handling path.
     private var apiKey: String {
-        let key = Self.keyPlaceholder
-        KeychainHelper.save(key, for: Self.keychainAccount)
-        return key
+        KeychainHelper.load(for: Self.keychainAccount) ?? ""
     }
 
-    /// Call this to overwrite the stored key (e.g. from a settings screen).
+    /// Seeds or updates the API key in the Keychain. Call once at app startup
+    /// from a file that is excluded from version control.
     static func updateAPIKey(_ key: String) {
         KeychainHelper.save(key, for: keychainAccount)
     }
@@ -46,12 +61,8 @@ struct HoroscopeService {
         request.httpMethod = "GET"
         request.setValue(key, forHTTPHeaderField: "X-Api-Key")
 
-        // ── Debug: print full request ────────────────────────────────────────
-        let keyTrimmed     = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        let keyPreview     = key.count > 8 ? String(key.prefix(8)) + "..." : key
-        let zodiacValue    = sign.rawValue
-        let isLowercase    = zodiacValue == zodiacValue.lowercased()
-
+        #if DEBUG
+        let keyPreview = key.count > 8 ? String(key.prefix(8)) + "..." : key
         print("""
 
         ╔══════════════════════════════════════════════════════════
@@ -59,14 +70,11 @@ struct HoroscopeService {
         ╠══════════════════════════════════════════════════════════
         ║  URL       : \(url.absoluteString)
         ║  Method    : GET
-        ║  Zodiac    : \(zodiacValue)  (lowercase: \(isLowercase))
-        ╠═══════════════════════════════════════════════════════════
-        ║  HEADERS
+        ║  Zodiac    : \(sign.rawValue)
         ║  X-Api-Key : \(keyPreview)  (length: \(key.count) chars)
-        ║  Key trimmed == original: \(key == keyTrimmed)
-        ║  No old RapidAPI headers (X-RapidAPI-Key): confirmed ✓
         ╚══════════════════════════════════════════════════════════
         """)
+        #endif
 
         // ── Network call ─────────────────────────────────────────────────────
         let data: Data
@@ -75,38 +83,46 @@ struct HoroscopeService {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            #if DEBUG
             print("❌ [HoroscopeService] Network error: \(error)")
+            #endif
             throw error
         }
 
-        // ── Debug: print full response ───────────────────────────────────────
-        let http       = response as? HTTPURLResponse
-        let statusCode = http?.statusCode ?? -1
-        let rawBody    = String(data: data, encoding: .utf8) ?? "<binary / unreadable>"
+        // ── Validate response ────────────────────────────────────────────────
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
 
+        #if DEBUG
+        let rawBody = String(data: data, encoding: .utf8) ?? "<binary / unreadable>"
         print("""
 
         ╔══════════════════════════════════════════════════════════
         ║  📡 HoroscopeService — RESPONSE
         ╠══════════════════════════════════════════════════════════
         ║  Status : \(statusCode)  \(statusCode == 200 ? "✅" : "❌")
-        ╠══════════════════════════════════════════════════════════
         ║  Body   : \(rawBody)
         ╚══════════════════════════════════════════════════════════
         """)
+        #endif
 
         guard statusCode == 200 else {
+            #if DEBUG
             print("❌ [HoroscopeService] Non-200 status \(statusCode). Check API key and quota at api-ninjas.com.")
+            #endif
             throw URLError(.badServerResponse)
         }
 
         // ── Decode ───────────────────────────────────────────────────────────
         do {
             let decoded = try JSONDecoder().decode(HoroscopeAPIResponse.self, from: data)
+            #if DEBUG
             print("✅ [HoroscopeService] Decoded successfully — sign: \(decoded.sign)")
+            #endif
             return HoroscopeData(sign: decoded.sign, horoscope: decoded.horoscope)
         } catch {
+            #if DEBUG
             print("❌ [HoroscopeService] Decoding error: \(error)")
+            #endif
             throw error
         }
     }

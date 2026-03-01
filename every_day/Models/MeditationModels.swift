@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftData
+import AudioToolbox
 
 // MARK: - MeditationSession
 
@@ -54,5 +55,59 @@ enum MeditationDuration: Int, CaseIterable, Identifiable {
         case .twenty:  return "20 min"
         case .thirty:  return "30 min"
         }
+    }
+}
+
+// MARK: - BellSound
+
+enum BellSound: String, CaseIterable, Identifiable {
+    case silent      = "silent"
+    case bell        = "bell"
+    case singingBowl = "singingBowl"
+    case gong        = "gong"
+    case softClick   = "softClick"
+    case chime       = "chime"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .silent:      return "Silent"
+        case .bell:        return "Bell"
+        case .singingBowl: return "Singing Bowl"
+        case .gong:        return "Gong"
+        case .softClick:   return "Soft Click"
+        case .chime:       return "Chime"
+        }
+    }
+
+    var sfSymbol: String {
+        switch self {
+        case .silent:      return "speaker.slash.fill"
+        case .bell:        return "bell.fill"
+        case .singingBowl: return "waveform"
+        case .gong:        return "music.quarternote.3"
+        case .softClick:   return "hand.tap.fill"
+        case .chime:       return "music.note"
+        }
+    }
+
+    /// System sound ID to play, or nil for silent.
+    var systemSoundID: UInt32? {
+        switch self {
+        case .silent:      return nil
+        case .bell:        return 1013
+        case .singingBowl: return 1016
+        case .gong:        return 1008
+        case .softClick:   return 1104
+        case .chime:       return 1007
+        }
+    }
+
+    /// Plays a brief preview of this sound. No-ops for `.silent`.
+    /// Safe to call from any screen — no external setup required.
+    func preview() {
+        guard let soundID = systemSoundID else { return }
+        AudioServicesPlaySystemSound(soundID)
     }
 }

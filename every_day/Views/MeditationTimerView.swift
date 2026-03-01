@@ -12,11 +12,18 @@ import SwiftData
 struct MeditationTimerView: View {
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase)   private var scenePhase
     @State private var vm             = MeditationViewModel()
     @State private var showJournal    = false
     @State private var isPulsing      = false
     @State private var customMinutes  = 20
     @State private var useCustom      = false
+    @State private var holdTimer: Timer?
+    @State private var isHolding      = false
+
+    // Sync default duration and bell sound from Settings without restarting the VM
+    @AppStorage("defaultMeditationDuration") private var defaultDuration = 600
+    @AppStorage("meditation_bell_sound")     private var defaultBellSound = BellSound.bell.rawValue
 
     var body: some View {
         NavigationStack {
@@ -35,7 +42,29 @@ struct MeditationTimerView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear {
+                // Recover any session that was interrupted by an app kill/crash.
+                vm.recoverOrphanedSession(in: modelContext)
                 vm.loadStats(from: modelContext)
+                // Apply defaults from Settings if not mid-session
+                if !vm.isRunning {
+                    if defaultDuration > 0 { vm.selectedDuration = defaultDuration }
+                    if let sound = BellSound(rawValue: defaultBellSound) {
+                        vm.selectedBellSound = sound
+                    }
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    vm.reconcileAfterBackground(in: modelContext)
+                }
+            }
+            .onChange(of: defaultDuration) { _, newVal in
+                if !vm.isRunning, newVal > 0 { vm.selectedDuration = newVal }
+            }
+            .onChange(of: defaultBellSound) { _, newVal in
+                if !vm.isRunning, let sound = BellSound(rawValue: newVal) {
+                    vm.selectedBellSound = sound
+                }
             }
             .sheet(isPresented: $showJournal) {
                 JournalEditorView(entry: nil, initialTitle: "Post-Meditation Reflection")
@@ -121,6 +150,22 @@ struct MeditationTimerView: View {
                     }
                 }
 
+                // ── Bell sound picker ──────────────────────────────────────
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionLabel("Bell Sound")
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(BellSound.allCases) { sound in
+                                soundPill(sound: sound, isSelected: vm.selectedBellSound == sound) {
+                                    vm.selectBellSound(sound)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+
                 // ── Start button ───────────────────────────────────────────
                 Button {
                     vm.start(in: modelContext)
@@ -156,7 +201,7 @@ struct MeditationTimerView: View {
     // MARK: - Timer Screen
 
     private var timerView: some View {
-        VStack(spacing: 48) {
+        VStack(spacing: 32) {
 
             // ── Circular progress ring ─────────────────────────────────────
             ZStack {
@@ -222,6 +267,14 @@ struct MeditationTimerView: View {
             .onAppear { isPulsing = true }
             .onDisappear { isPulsing = false }
 
+            // ── Time adjustment ────────────────────────────────────────────
+            HStack(spacing: 10) {
+                timeAdjustButton(delta: -300, label: "−5m")
+                timeAdjustButton(delta: -60,  label: "−1m")
+                timeAdjustButton(delta: +60,  label: "+1m")
+                timeAdjustButton(delta: +300, label: "+5m")
+            }
+
             // ── Controls ───────────────────────────────────────────────────
             HStack(spacing: 24) {
                 // Stop
@@ -263,6 +316,11 @@ struct MeditationTimerView: View {
                 Color.clear
                     .frame(width: 60, height: 60)
             }
+        }
+        .onDisappear {
+            holdTimer?.invalidate()
+            holdTimer = nil
+            isHolding = false
         }
     }
 
@@ -376,6 +434,61 @@ struct MeditationTimerView: View {
                 .foregroundStyle(.white.opacity(0.45))
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// A tap-and-hold time adjustment button.
+    /// Single tap applies delta once; holding repeats at 0.2 s intervals.
+    private func timeAdjustButton(delta: Int, label: String) -> some View {
+        Text(label)
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(width: 54, height: 34)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+            )
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isHolding else { return }
+                        isHolding = true
+                        vm.adjustTime(by: delta)
+                        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+                            vm.adjustTime(by: delta)
+                        }
+                        RunLoop.main.add(holdTimer!, forMode: .common)
+                    }
+                    .onEnded { _ in
+                        isHolding = false
+                        holdTimer?.invalidate()
+                        holdTimer = nil
+                    }
+            )
+    }
+
+    private func soundPill(sound: BellSound, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: sound.sfSymbol)
+                    .font(.caption)
+                Text(sound.label)
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+            }
+            .foregroundStyle(isSelected ? .black : .white.opacity(0.75))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.orbitGold : Color.white.opacity(0.08))
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 
     private func durationPill(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

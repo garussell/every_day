@@ -14,6 +14,8 @@ struct DailyReflectionCard: View {
     @State private var appeared = false
     @State private var showFavorites = false
 
+    @AppStorage("defaultPromptCategory") private var defaultCategory = "all"
+
     /// Called when the user taps "Reflect" — passes the prompt text as the
     /// pre-filled title for a new journal entry.
     var onReflect: (String) -> Void
@@ -112,9 +114,13 @@ struct DailyReflectionCard: View {
             }
         }
         .onAppear {
+            vm.filterCategory = defaultCategory
             withAnimation(.spring(dampingFraction: 0.78).delay(0.1)) {
                 appeared = true
             }
+        }
+        .onChange(of: defaultCategory) { _, newCat in
+            vm.filterCategory = newCat
         }
         .sheet(isPresented: $showFavorites) {
             FavoritePromptsView(vm: vm, onReflect: { text in

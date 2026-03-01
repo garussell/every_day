@@ -476,6 +476,7 @@ struct JournalModelTests {
 
 // MARK: - Journal ViewModel Tests
 
+@MainActor
 @Suite("Journal ViewModel CRUD")
 struct JournalViewModelTests {
 

@@ -59,6 +59,17 @@ final class DashboardViewModel {
         locationService.requestLocation()
     }
 
+    /// Changes the zodiac sign from Settings, clearing the cache first so a
+    /// fresh API call is always made regardless of any same-day cached reading.
+    func changeSign(_ sign: ZodiacSign) {
+        HoroscopeCache.clearCache(for: sign)
+        _selectedSignRaw = sign.rawValue
+        UserDefaults.standard.set(sign.rawValue, forKey: "selectedZodiacSign")
+        horoscopeData  = nil
+        horoscopeError = nil
+        Task { await fetchHoroscope(for: sign) }
+    }
+
     /// Called by the View whenever locationService.location becomes non-nil.
     func onLocationAvailable(_ location: CLLocation) async {
         await withTaskGroup(of: Void.self) { group in
@@ -117,7 +128,9 @@ final class DashboardViewModel {
         // ── 1. Fresh cache hit — skip network entirely ───────────────────────
         if let cached = HoroscopeCache.cachedToday(for: sign) {
             horoscopeData = HoroscopeData(sign: sign.displayName, horoscope: cached)
+            #if DEBUG
             print("✅ [HoroscopeCache] Serving today's cached horoscope for \(sign.displayName)")
+            #endif
             return
         }
 
@@ -135,11 +148,15 @@ final class DashboardViewModel {
             if let stale = HoroscopeCache.staleCached(for: sign) {
                 horoscopeData  = HoroscopeData(sign: sign.displayName, horoscope: stale)
                 horoscopeError = nil
+                #if DEBUG
                 print("⚠️ [HoroscopeCache] API failed — serving stale horoscope for \(sign.displayName)")
+                #endif
             } else {
                 // ── 3b. No cache at all — surface an error ───────────────────
                 horoscopeError = "Today's horoscope is unavailable. Pull down to retry."
+                #if DEBUG
                 print("❌ [HoroscopeCache] API failed and no cache exists for \(sign.displayName)")
+                #endif
             }
         }
     }

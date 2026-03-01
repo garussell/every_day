@@ -77,7 +77,7 @@ struct JournalListView: View {
                         Text("No entries yet")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.6))
-                        Text("Tap a prompt above or   to write your first entry.")
+                        Text("Tap a prompt above or \(Image(systemName: "square.and.pencil")) to write your first entry.")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.35))
                             .multilineTextAlignment(.center)
