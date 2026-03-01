@@ -534,6 +534,7 @@ struct JournalViewModelTests {
             title: "Final", body: "Updated body.",
             moodX: 0.2, moodY: 0.8,
             moodQuadrant: MoodQuadrant.red.rawValue, moodWord: "Anxious",
+            dreamClarity: 4,
             in: context
         )
 

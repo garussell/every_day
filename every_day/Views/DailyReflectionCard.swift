@@ -2,7 +2,7 @@
 //  DailyReflectionCard.swift
 //  every_day
 //
-//  Displays today's reflection prompt at the top of the Journal list.
+//  Displays today's dream prompt at the top of the Dream Journal list.
 //  One prompt per day, changes at midnight, can be favorited and shared.
 //
 
@@ -35,7 +35,7 @@ struct DailyReflectionCard: View {
                         .foregroundStyle(vm.todaysPrompt.category.color)
                         .kerning(0.8)
 
-                    Text("· Today's Prompt")
+                    Text("· Dream Prompt")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.38))
 
@@ -74,9 +74,9 @@ struct DailyReflectionCard: View {
                         onReflect(vm.todaysPrompt.text)
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "pencil.and.list.clipboard")
+                            Image(systemName: "moon.zzz.fill")
                                 .font(.subheadline)
-                            Text("Reflect")
+                            Text("Record Dream")
                                 .font(.subheadline.weight(.semibold))
                         }
                         .foregroundStyle(Color.orbitGold)
@@ -176,7 +176,7 @@ struct FavoritePromptsView: View {
                             Button {
                                 onReflect(prompt.text)
                             } label: {
-                                Label("Reflect", systemImage: "pencil.and.list.clipboard")
+                                Label("Record Dream", systemImage: "moon.zzz.fill")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(Color.orbitGold)
                             }
@@ -190,7 +190,7 @@ struct FavoritePromptsView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .navigationTitle("Saved Prompts")
+            .navigationTitle("Saved Dream Prompts")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

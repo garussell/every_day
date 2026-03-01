@@ -23,7 +23,7 @@ struct JournalListView: View {
                 CelestialBackground()
                 entryList
             }
-            .navigationTitle("Journal")
+            .navigationTitle("Dream Journal")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -71,13 +71,13 @@ struct JournalListView: View {
             if entries.isEmpty {
                 Section {
                     VStack(spacing: 16) {
-                        Image(systemName: "book.closed.fill")
+                        Image(systemName: "moon.zzz.fill")
                             .font(.system(size: 48))
                             .foregroundStyle(Color.orbitGold.opacity(0.35))
-                        Text("No entries yet")
+                        Text("No dreams recorded yet")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.6))
-                        Text("Tap a prompt above or \(Image(systemName: "square.and.pencil")) to write your first entry.")
+                        Text("Tap a prompt above or \(Image(systemName: "square.and.pencil")) to capture your first dream.")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.35))
                             .multilineTextAlignment(.center)
@@ -133,6 +133,15 @@ private struct JournalRowView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(Color.orbitGold.opacity(0.12)))
+
+                    // Dream clarity indicator
+                    if let symbol = entry.dreamClaritySymbol {
+                        HStack(spacing: 3) {
+                            Image(systemName: symbol)
+                                .font(.caption2)
+                                .foregroundStyle(entry.dreamClarityColor)
+                        }
+                    }
 
                     Spacer()
 
