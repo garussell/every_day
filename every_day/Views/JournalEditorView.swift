@@ -28,6 +28,9 @@ struct JournalEditorView: View {
     @State private var moodY: Double        = 0.5
     @State private var hasMoodSelection: Bool = false
 
+    // Dream Clarity state (1-5, 0 = not set)
+    @State private var dreamClarity: Int    = 0
+
     // MARK: - ViewModel
 
     @State private var vm = JournalViewModel()
@@ -42,12 +45,15 @@ struct JournalEditorView: View {
 
     private var hasChanges: Bool {
         if let e = entry {
+            let existingClarity = e.dreamClarity ?? 0
             return title != e.title || entryBody != e.body ||
                    hasMoodSelection != e.hasMoodSelection ||
-                   moodX != e.moodX || moodY != e.moodY
+                   moodX != e.moodX || moodY != e.moodY ||
+                   dreamClarity != existingClarity
         }
         return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-               !entryBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+               !entryBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+               dreamClarity > 0
     }
 
     // MARK: - Body
@@ -73,10 +79,10 @@ struct JournalEditorView: View {
                             .tint(Color.orbitGold)
                         }
 
-                        // ── Title field ─────────────────────────────────────
+                        // ── Dream title ─────────────────────────────────────
                         VStack(alignment: .leading, spacing: 6) {
-                            fieldLabel("Title (optional)")
-                            TextField("Give your entry a title…", text: $title)
+                            fieldLabel("Dream Title (optional)")
+                            TextField("Name this dream...", text: $title)
                                 .font(.body)
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 14)
@@ -84,17 +90,32 @@ struct JournalEditorView: View {
                                 .background(fieldBackground)
                         }
 
-                        // ── Journal body ────────────────────────────────────
+                        // ── Dream Clarity ────────────────────────────────────
+                        VStack(alignment: .leading, spacing: 10) {
+                            fieldLabel("Dream Clarity")
+                            DreamClarityPicker(selection: $dreamClarity)
+                        }
+
+                        // ── Dream body ────────────────────────────────────
                         VStack(alignment: .leading, spacing: 6) {
-                            fieldLabel("Journal Entry")
-                            TextEditor(text: $entryBody)
-                                .font(.body)
-                                .foregroundStyle(.white)
-                                .scrollContentBackground(.hidden)
-                                .frame(minHeight: 90)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 10)
-                                .background(fieldBackground)
+                            fieldLabel("Dream Entry")
+                            ZStack(alignment: .topLeading) {
+                                if entryBody.isEmpty {
+                                    Text("Begin writing... let the images come without judgement")
+                                        .font(.body)
+                                        .foregroundStyle(.white.opacity(0.35))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                }
+                                TextEditor(text: $entryBody)
+                                    .font(.body)
+                                    .foregroundStyle(.white)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(minHeight: 120)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 10)
+                            }
+                            .background(fieldBackground)
                         }
 
                         // ── Mood Meter (hidden when user disables in Settings) ──
@@ -136,7 +157,7 @@ struct JournalEditorView: View {
                 }
                 .allowsHitTesting(false)
             }
-            .navigationTitle(isEditing ? "Edit Entry" : "New Entry")
+            .navigationTitle(isEditing ? "Edit Dream" : "New Dream")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -173,6 +194,7 @@ struct JournalEditorView: View {
             moodX            = e.moodX
             moodY            = e.moodY
             hasMoodSelection = e.hasMoodSelection
+            dreamClarity     = e.dreamClarity ?? 0
         } else if let initial = initialTitle {
             title = initial
         }
@@ -183,6 +205,7 @@ struct JournalEditorView: View {
         let trimmedBody  = entryBody.trimmingCharacters(in: .whitespacesAndNewlines)
         let quadrant     = hasMoodSelection ? MoodMeter.quadrant(x: moodX, y: moodY).rawValue : nil
         let word         = hasMoodSelection ? MoodMeter.nearestWord(x: moodX, y: moodY)?.word : nil
+        let clarity: Int? = dreamClarity > 0 ? dreamClarity : nil
 
         if let existing = entry {
             vm.updateEntry(
@@ -193,6 +216,7 @@ struct JournalEditorView: View {
                 moodY: moodY,
                 moodQuadrant: quadrant,
                 moodWord: word,
+                dreamClarity: clarity,
                 in: modelContext
             )
         } else {
@@ -203,6 +227,7 @@ struct JournalEditorView: View {
                 moodY: moodY,
                 moodQuadrant: quadrant,
                 moodWord: word,
+                dreamClarity: clarity,
                 date: entryDate,
                 in: modelContext
             )
@@ -225,5 +250,86 @@ struct JournalEditorView: View {
             .foregroundStyle(Color.orbitGold.opacity(0.8))
             .textCase(.uppercase)
             .kerning(0.5)
+    }
+}
+
+// MARK: - DreamClarityPicker
+
+/// A 1–5 clarity scale for rating how vividly the dream was remembered.
+private struct DreamClarityPicker: View {
+    @Binding var selection: Int
+
+    private let levels: [(value: Int, label: String, symbol: String)] = [
+        (1, "Barely a feeling", "cloud.fog.fill"),
+        (2, "Fragments only", "cloud.fill"),
+        (3, "Some scenes", "cloud.moon.fill"),
+        (4, "Most of it", "moon.fill"),
+        (5, "Vivid and complete", "sparkles"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // 5 circular buttons in a row
+            HStack(spacing: 12) {
+                ForEach(levels, id: \.value) { level in
+                    Button {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                            selection = selection == level.value ? 0 : level.value
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(selection == level.value ? clarityColor(level.value) : Color.white.opacity(0.08))
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            selection == level.value ? clarityColor(level.value) : Color.white.opacity(0.15),
+                                            lineWidth: 1.5
+                                        )
+                                )
+
+                            Image(systemName: level.symbol)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(selection == level.value ? .white : .white.opacity(0.4))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Label for selected clarity
+            if selection > 0, let level = levels.first(where: { $0.value == selection }) {
+                Text(level.label)
+                    .font(.caption)
+                    .foregroundStyle(clarityColor(selection))
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            } else {
+                Text("Tap to rate how clearly you remember this dream")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orbitGold.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+
+    private func clarityColor(_ value: Int) -> Color {
+        switch value {
+        case 1: return Color(red: 0.5, green: 0.5, blue: 0.6)
+        case 2: return Color(red: 0.55, green: 0.55, blue: 0.7)
+        case 3: return Color(red: 0.6, green: 0.6, blue: 0.8)
+        case 4: return Color(red: 0.7, green: 0.7, blue: 0.9)
+        case 5: return Color(red: 0.85, green: 0.75, blue: 0.95)
+        default: return .white.opacity(0.3)
+        }
     }
 }

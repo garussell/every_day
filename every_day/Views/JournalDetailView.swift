@@ -42,14 +42,20 @@ struct JournalDetailView: View {
                             .foregroundStyle(.white)
                     }
 
+                    // ── Dream Clarity section ─────────────────────────────
+                    if let clarityLabel = entry.dreamClarityLabel,
+                       let claritySymbol = entry.dreamClaritySymbol {
+                        dreamClaritySection(label: clarityLabel, symbol: claritySymbol)
+                    }
+
                     // ── Mood section ───────────────────────────────────────
                     if entry.hasMoodSelection, let quadrant = entry.quadrantEnum {
                         moodSection(quadrant: quadrant)
                     }
 
-                    // ── Body text ──────────────────────────────────────────
+                    // ── Dream body ──────────────────────────────────────────
                     VStack(alignment: .leading, spacing: 8) {
-                        sectionLabel("Entry")
+                        sectionLabel("Dream")
                         Text(entry.body)
                             .font(.body)
                             .foregroundStyle(.white.opacity(0.88))
@@ -93,14 +99,57 @@ struct JournalDetailView: View {
         .sheet(isPresented: $showingEditor) {
             JournalEditorView(entry: entry)
         }
-        .alert("Delete Entry", isPresented: $showDeleteAlert) {
+        .alert("Delete Dream", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 vm.deleteEntry(entry, in: modelContext)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This entry will be permanently deleted.")
+            Text("This dream entry will be permanently deleted.")
+        }
+    }
+
+    // MARK: - Dream Clarity section
+
+    private func dreamClaritySection(label: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Dream Clarity")
+
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(entry.dreamClarityColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white)
+
+                    // Clarity dots
+                    HStack(spacing: 4) {
+                        ForEach(1...5, id: \.self) { level in
+                            Circle()
+                                .fill(level <= (entry.dreamClarity ?? 0)
+                                    ? entry.dreamClarityColor
+                                    : Color.white.opacity(0.15))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(entry.dreamClarityColor.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(entry.dreamClarityColor.opacity(0.25), lineWidth: 1)
+                    )
+            )
         }
     }
 

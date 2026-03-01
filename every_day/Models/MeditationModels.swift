@@ -66,7 +66,6 @@ enum BellSound: String, CaseIterable, Identifiable {
     case singingBowl = "singingBowl"
     case gong        = "gong"
     case softClick   = "softClick"
-    case chime       = "chime"
 
     var id: String { rawValue }
 
@@ -74,10 +73,9 @@ enum BellSound: String, CaseIterable, Identifiable {
         switch self {
         case .silent:      return "Silent"
         case .bell:        return "Bell"
-        case .singingBowl: return "Singing Bowl"
-        case .gong:        return "Gong"
+        case .singingBowl: return "Whistle"
+        case .gong:        return "Chime"
         case .softClick:   return "Soft Click"
-        case .chime:       return "Chime"
         }
     }
 
@@ -88,7 +86,6 @@ enum BellSound: String, CaseIterable, Identifiable {
         case .singingBowl: return "waveform"
         case .gong:        return "music.quarternote.3"
         case .softClick:   return "hand.tap.fill"
-        case .chime:       return "music.note"
         }
     }
 
@@ -100,7 +97,6 @@ enum BellSound: String, CaseIterable, Identifiable {
         case .singingBowl: return 1016
         case .gong:        return 1008
         case .softClick:   return 1104
-        case .chime:       return 1007
         }
     }
 

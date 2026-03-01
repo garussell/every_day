@@ -190,6 +190,13 @@ final class JournalEntry {
     /// Nearest emotion word to the pin position, or nil when not set.
     var moodWord: String?
 
+    // MARK: Dream Clarity
+
+    /// Dream clarity on a 1–5 scale, or nil if not set.
+    /// 1 = Barely a feeling, 2 = Fragments only, 3 = Some scenes,
+    /// 4 = Most of it, 5 = Vivid and complete.
+    var dreamClarity: Int?
+
     init(
         title: String = "",
         body: String,
@@ -197,6 +204,7 @@ final class JournalEntry {
         moodY: Double = 0.5,
         moodQuadrant: String? = nil,
         moodWord: String? = nil,
+        dreamClarity: Int? = nil,
         date: Date = .now
     ) {
         self.id           = UUID()
@@ -208,6 +216,7 @@ final class JournalEntry {
         self.moodY        = moodY
         self.moodQuadrant = moodQuadrant
         self.moodWord     = moodWord
+        self.dreamClarity = dreamClarity
     }
 
     // MARK: - Computed helpers (not persisted)
@@ -231,11 +240,55 @@ final class JournalEntry {
         String(repeating: "☆", count: 5 - moodScore)
     }
 
+    // MARK: - Dream Clarity Helpers
+
+    /// Dream clarity label for display.
+    var dreamClarityLabel: String? {
+        guard let clarity = dreamClarity else { return nil }
+        switch clarity {
+        case 1: return "Barely a feeling"
+        case 2: return "Fragments only"
+        case 3: return "Some scenes"
+        case 4: return "Most of it"
+        case 5: return "Vivid and complete"
+        default: return nil
+        }
+    }
+
+    /// SF Symbol for dream clarity level.
+    var dreamClaritySymbol: String? {
+        guard let clarity = dreamClarity else { return nil }
+        switch clarity {
+        case 1: return "cloud.fog.fill"
+        case 2: return "cloud.fill"
+        case 3: return "cloud.moon.fill"
+        case 4: return "moon.fill"
+        case 5: return "sparkles"
+        default: return nil
+        }
+    }
+
+    /// Color for dream clarity level.
+    var dreamClarityColor: Color {
+        guard let clarity = dreamClarity else { return .white.opacity(0.3) }
+        switch clarity {
+        case 1: return Color(red: 0.5, green: 0.5, blue: 0.6)   // Muted fog
+        case 2: return Color(red: 0.55, green: 0.55, blue: 0.7) // Hazy
+        case 3: return Color(red: 0.6, green: 0.6, blue: 0.8)   // Emerging
+        case 4: return Color(red: 0.7, green: 0.7, blue: 0.9)   // Clear
+        case 5: return Color(red: 0.85, green: 0.75, blue: 0.95) // Vivid violet
+        default: return .white.opacity(0.3)
+        }
+    }
+
     /// Plain-text representation for sharing.
     var shareText: String {
         let dateStr = createdAt.formatted(date: .long, time: .shortened)
-        var lines: [String] = ["📓 DailyOrbit Journal", dateStr]
+        var lines: [String] = ["🌙 Dream Journal", dateStr]
         if !title.isEmpty { lines.append(title) }
+        if let clarityLabel = dreamClarityLabel {
+            lines.append("Clarity: \(clarityLabel)")
+        }
         if let word = moodWord, let quadrant = quadrantEnum {
             lines.append("Mood: \(word) (\(quadrant.title))  \(moodStars)")
         }

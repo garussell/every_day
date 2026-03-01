@@ -166,7 +166,7 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         Section {
-            // Daily reflection toggle
+            // Dream journal reminder toggle
             Toggle(isOn: Binding(
                 get: { settingsVM.reflectionReminderEnabled },
                 set: { enabled in
@@ -174,7 +174,7 @@ struct SettingsView: View {
                     else       { settingsVM.reflectionReminderEnabled = false }
                 }
             )) {
-                Label("Daily Reflection Reminder", systemImage: "book.fill")
+                Label("Dream Journal Reminder", systemImage: "moon.zzz.fill")
                     .foregroundStyle(.white)
             }
 
@@ -259,7 +259,7 @@ struct SettingsView: View {
         .listRowBackground(rowBackground)
     }
 
-    // MARK: - Journal
+    // MARK: - Dream Journal
 
     private var journalSection: some View {
         Section {
@@ -267,12 +267,12 @@ struct SettingsView: View {
                 get: { settingsVM.defaultPromptCategory },
                 set: { settingsVM.defaultPromptCategory = $0 }
             )) {
-                Text("All").tag("all")
-                ForEach(ReflectionCategory.allCases, id: \.rawValue) { cat in
+                Text("All Categories").tag("all")
+                ForEach(DreamCategory.allCases, id: \.rawValue) { cat in
                     Label(cat.rawValue, systemImage: cat.sfSymbol).tag(cat.rawValue)
                 }
             } label: {
-                Label("Daily Prompt Category", systemImage: "lightbulb.fill")
+                Label("Dream Prompt Focus", systemImage: "moon.stars.fill")
                     .foregroundStyle(.white)
             }
 
@@ -281,7 +281,7 @@ struct SettingsView: View {
                     .foregroundStyle(.white)
             }
         } header: {
-            sectionHeader("Journal")
+            sectionHeader("Dream Journal")
         }
         .listRowBackground(rowBackground)
     }

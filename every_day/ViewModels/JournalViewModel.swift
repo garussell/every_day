@@ -41,6 +41,7 @@ final class JournalViewModel {
         moodY: Double = 0.5,
         moodQuadrant: String? = nil,
         moodWord: String? = nil,
+        dreamClarity: Int? = nil,
         date: Date = .now,
         in context: ModelContext
     ) -> JournalEntry {
@@ -51,6 +52,7 @@ final class JournalViewModel {
             moodY: moodY,
             moodQuadrant: moodQuadrant,
             moodWord: moodWord,
+            dreamClarity: dreamClarity,
             date: date
         )
         context.insert(entry)
@@ -68,6 +70,7 @@ final class JournalViewModel {
         moodY: Double,
         moodQuadrant: String?,
         moodWord: String?,
+        dreamClarity: Int?,
         in context: ModelContext
     ) {
         entry.title        = title
@@ -76,6 +79,7 @@ final class JournalViewModel {
         entry.moodY        = moodY
         entry.moodQuadrant = moodQuadrant
         entry.moodWord     = moodWord
+        entry.dreamClarity = dreamClarity
         entry.editedAt     = .now
         save(context)
     }
