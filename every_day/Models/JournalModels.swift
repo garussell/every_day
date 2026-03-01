@@ -1,0 +1,255 @@
+//
+//  JournalModels.swift
+//  every_day
+//
+
+import Foundation
+import SwiftUI
+import SwiftData
+
+// MARK: - MoodQuadrant
+
+enum MoodQuadrant: String, CaseIterable {
+    case red
+    case yellow
+    case blue
+    case green
+
+    var color: Color {
+        switch self {
+        case .red:    return Color(red: 0.85, green: 0.25, blue: 0.25)
+        case .yellow: return Color(red: 0.95, green: 0.80, blue: 0.20)
+        case .blue:   return Color(red: 0.25, green: 0.45, blue: 0.85)
+        case .green:  return Color(red: 0.25, green: 0.72, blue: 0.45)
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .red:    return "Red Zone"
+        case .yellow: return "Yellow Zone"
+        case .blue:   return "Blue Zone"
+        case .green:  return "Green Zone"
+        }
+    }
+
+    var energyLabel: String {
+        switch self {
+        case .red, .yellow: return "High Energy"
+        case .blue, .green: return "Low Energy"
+        }
+    }
+
+    var pleasantnessLabel: String {
+        switch self {
+        case .red, .blue:    return "Unpleasant"
+        case .yellow, .green: return "Pleasant"
+        }
+    }
+
+    var sfSymbol: String {
+        switch self {
+        case .red:    return "flame.fill"
+        case .yellow: return "sun.max.fill"
+        case .blue:   return "cloud.fill"
+        case .green:  return "leaf.fill"
+        }
+    }
+
+    /// Mood score on a 1–5 scale (for display / sorting).
+    var moodScore: Int {
+        switch self {
+        case .blue:   return 1
+        case .red:    return 2
+        case .green:  return 4
+        case .yellow: return 5
+        }
+    }
+}
+
+// MARK: - MoodWord
+
+struct MoodWord: Identifiable {
+    let id: UUID = UUID()
+    let word: String
+    let quadrant: MoodQuadrant
+    /// Normalized position in conceptual space:
+    ///   x: 0.0 = far left / unpleasant, 1.0 = far right / pleasant
+    ///   y: 0.0 = bottom / low energy,   1.0 = top / high energy
+    let x: Double
+    let y: Double
+}
+
+// MARK: - MoodMeter (data + helpers)
+
+enum MoodMeter {
+
+    // MARK: Word List
+    // 10 words per quadrant, distributed within their respective quadrant.
+    // Quadrant boundaries in conceptual (x,y) space:
+    //   Red:    x 0.0–0.5, y 0.5–1.0
+    //   Yellow: x 0.5–1.0, y 0.5–1.0
+    //   Blue:   x 0.0–0.5, y 0.0–0.5
+    //   Green:  x 0.5–1.0, y 0.0–0.5
+    static let words: [MoodWord] = [
+
+        // ── Red: High Energy + Unpleasant ──────────────────────────────────
+        MoodWord(word: "Furious",    quadrant: .red, x: 0.07, y: 0.94),
+        MoodWord(word: "Panicked",   quadrant: .red, x: 0.24, y: 0.93),
+        MoodWord(word: "Alarmed",    quadrant: .red, x: 0.42, y: 0.91),
+        MoodWord(word: "Angry",      quadrant: .red, x: 0.08, y: 0.79),
+        MoodWord(word: "Anxious",    quadrant: .red, x: 0.23, y: 0.78),
+        MoodWord(word: "Fearful",    quadrant: .red, x: 0.40, y: 0.77),
+        MoodWord(word: "Stressed",   quadrant: .red, x: 0.08, y: 0.65),
+        MoodWord(word: "Frustrated", quadrant: .red, x: 0.22, y: 0.64),
+        MoodWord(word: "Tense",      quadrant: .red, x: 0.38, y: 0.62),
+        MoodWord(word: "Worried",    quadrant: .red, x: 0.46, y: 0.54),
+
+        // ── Yellow: High Energy + Pleasant ─────────────────────────────────
+        MoodWord(word: "Elated",       quadrant: .yellow, x: 0.57, y: 0.94),
+        MoodWord(word: "Joyful",       quadrant: .yellow, x: 0.74, y: 0.93),
+        MoodWord(word: "Proud",        quadrant: .yellow, x: 0.92, y: 0.91),
+        MoodWord(word: "Excited",      quadrant: .yellow, x: 0.56, y: 0.79),
+        MoodWord(word: "Passionate",   quadrant: .yellow, x: 0.73, y: 0.78),
+        MoodWord(word: "Enthusiastic", quadrant: .yellow, x: 0.90, y: 0.77),
+        MoodWord(word: "Inspired",     quadrant: .yellow, x: 0.57, y: 0.65),
+        MoodWord(word: "Energized",    quadrant: .yellow, x: 0.74, y: 0.64),
+        MoodWord(word: "Hopeful",      quadrant: .yellow, x: 0.91, y: 0.62),
+        MoodWord(word: "Happy",        quadrant: .yellow, x: 0.72, y: 0.54),
+
+        // ── Blue: Low Energy + Unpleasant ──────────────────────────────────
+        MoodWord(word: "Bored",        quadrant: .blue, x: 0.07, y: 0.38),
+        MoodWord(word: "Lonely",       quadrant: .blue, x: 0.23, y: 0.37),
+        MoodWord(word: "Hopeless",     quadrant: .blue, x: 0.40, y: 0.36),
+        MoodWord(word: "Sad",          quadrant: .blue, x: 0.08, y: 0.26),
+        MoodWord(word: "Tired",        quadrant: .blue, x: 0.22, y: 0.25),
+        MoodWord(word: "Despondent",   quadrant: .blue, x: 0.40, y: 0.24),
+        MoodWord(word: "Drained",      quadrant: .blue, x: 0.08, y: 0.14),
+        MoodWord(word: "Melancholy",   quadrant: .blue, x: 0.24, y: 0.13),
+        MoodWord(word: "Depressed",    quadrant: .blue, x: 0.38, y: 0.10),
+        MoodWord(word: "Disconnected", quadrant: .blue, x: 0.46, y: 0.06),
+
+        // ── Green: Low Energy + Pleasant ───────────────────────────────────
+        MoodWord(word: "Content",   quadrant: .green, x: 0.57, y: 0.38),
+        MoodWord(word: "Grateful",  quadrant: .green, x: 0.74, y: 0.37),
+        MoodWord(word: "Serene",    quadrant: .green, x: 0.93, y: 0.36),
+        MoodWord(word: "Calm",      quadrant: .green, x: 0.57, y: 0.26),
+        MoodWord(word: "Relaxed",   quadrant: .green, x: 0.74, y: 0.25),
+        MoodWord(word: "Peaceful",  quadrant: .green, x: 0.93, y: 0.24),
+        MoodWord(word: "Balanced",  quadrant: .green, x: 0.58, y: 0.14),
+        MoodWord(word: "At Ease",   quadrant: .green, x: 0.74, y: 0.13),
+        MoodWord(word: "Tranquil",  quadrant: .green, x: 0.92, y: 0.10),
+        MoodWord(word: "Restored",  quadrant: .green, x: 0.74, y: 0.06),
+    ]
+
+    // MARK: Helpers
+
+    /// Returns the quadrant for a given normalized (x, y) position.
+    static func quadrant(x: Double, y: Double) -> MoodQuadrant {
+        switch (x < 0.5, y >= 0.5) {
+        case (true,  true):  return .red
+        case (false, true):  return .yellow
+        case (true,  false): return .blue
+        case (false, false): return .green
+        }
+    }
+
+    /// Returns the word closest to (x, y) in Euclidean distance.
+    static func nearestWord(x: Double, y: Double) -> MoodWord? {
+        words.min {
+            hypot($0.x - x, $0.y - y) < hypot($1.x - x, $1.y - y)
+        }
+    }
+
+    /// Quadrant-based mood score on a 1–5 scale.
+    static func moodScore(for quadrant: MoodQuadrant?) -> Int {
+        quadrant?.moodScore ?? 3
+    }
+}
+
+// MARK: - JournalEntry
+
+@Model
+final class JournalEntry {
+
+    var id: UUID
+    var createdAt: Date
+    var editedAt: Date
+    var title: String
+    var body: String
+
+    // MARK: Mood Meter fields
+
+    /// Normalized pin position: 0.0 = unpleasant, 1.0 = pleasant.
+    var moodX: Double
+    /// Normalized pin position: 0.0 = low energy, 1.0 = high energy.
+    var moodY: Double
+    /// Quadrant raw-value string ("red" / "yellow" / "blue" / "green"), or nil
+    /// when the user has not placed the pin.
+    var moodQuadrant: String?
+    /// Nearest emotion word to the pin position, or nil when not set.
+    var moodWord: String?
+
+    init(
+        title: String = "",
+        body: String,
+        moodX: Double = 0.5,
+        moodY: Double = 0.5,
+        moodQuadrant: String? = nil,
+        moodWord: String? = nil,
+        date: Date = .now
+    ) {
+        self.id           = UUID()
+        self.createdAt    = date
+        self.editedAt     = date
+        self.title        = title
+        self.body         = body
+        self.moodX        = moodX
+        self.moodY        = moodY
+        self.moodQuadrant = moodQuadrant
+        self.moodWord     = moodWord
+    }
+
+    // MARK: - Computed helpers (not persisted)
+
+    var hasMoodSelection: Bool { moodQuadrant != nil }
+
+    var quadrantEnum: MoodQuadrant? {
+        moodQuadrant.flatMap { MoodQuadrant(rawValue: $0) }
+    }
+
+    var quadrantColor: Color {
+        quadrantEnum?.color ?? Color.white.opacity(0.2)
+    }
+
+    /// Mood score on a 1–5 scale derived from quadrant.
+    var moodScore: Int { MoodMeter.moodScore(for: quadrantEnum) }
+
+    /// Star-string representation, e.g. "★★★☆☆"
+    var moodStars: String {
+        String(repeating: "★", count: moodScore) +
+        String(repeating: "☆", count: 5 - moodScore)
+    }
+
+    /// Plain-text representation for sharing.
+    var shareText: String {
+        let dateStr = createdAt.formatted(date: .long, time: .shortened)
+        var lines: [String] = ["📓 DailyOrbit Journal", dateStr]
+        if !title.isEmpty { lines.append(title) }
+        if let word = moodWord, let quadrant = quadrantEnum {
+            lines.append("Mood: \(word) (\(quadrant.title))  \(moodStars)")
+        }
+        lines += ["", body]
+        return lines.joined(separator: "\n")
+    }
+
+    /// Display title: falls back to a 40-char body preview when untitled.
+    var displayTitle: String {
+        title.isEmpty ? String(body.prefix(40)) : title
+    }
+
+    /// Short formatted date for list rows.
+    var shortDate: String {
+        createdAt.formatted(date: .abbreviated, time: .shortened)
+    }
+}

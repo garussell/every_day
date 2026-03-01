@@ -2,17 +2,6 @@
 //  Item.swift
 //  every_day
 //
-//  Created by Allen Russell on 2/28/26.
+//  Original SwiftData template file — no longer used by DailyOrbit.
+//  Kept as an empty placeholder so the git diff stays minimal.
 //
-
-import Foundation
-import SwiftData
-
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
