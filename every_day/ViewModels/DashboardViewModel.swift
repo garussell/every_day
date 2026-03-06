@@ -6,6 +6,23 @@
 import Foundation
 import CoreLocation
 
+/// The type of horoscope to display (based on birth chart placement)
+enum HoroscopeType: String, CaseIterable, Identifiable {
+    case sun   = "Sun"
+    case moon  = "Moon"
+    case rising = "Rising"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .sun:    return "sun.max.fill"
+        case .moon:   return "moon.fill"
+        case .rising: return "arrow.up.circle.fill"
+        }
+    }
+}
+
 @Observable
 final class DashboardViewModel {
 
@@ -20,10 +37,57 @@ final class DashboardViewModel {
     var isLoadingMoon = false
     var moonError: String?
 
-    // MARK: - Horoscope State
+    // MARK: - Horoscope State (Single sign - legacy)
     var horoscopeData: HoroscopeData?
     var isLoadingHoroscope = false
     var horoscopeError: String?
+
+    // MARK: - Multi-Horoscope State (Birth Chart)
+
+    /// Currently selected horoscope type (Sun/Moon/Rising)
+    var selectedHoroscopeType: HoroscopeType = .sun
+
+    /// Horoscope data for each type
+    var sunHoroscope: HoroscopeData?
+    var moonHoroscope: HoroscopeData?
+    var risingHoroscope: HoroscopeData?
+
+    /// Loading states for each type
+    var isLoadingSunHoroscope = false
+    var isLoadingMoonHoroscope = false
+    var isLoadingRisingHoroscope = false
+
+    /// Error states for each type
+    var sunHoroscopeError: String?
+    var moonHoroscopeError: String?
+    var risingHoroscopeError: String?
+
+    /// Returns the currently selected horoscope based on type
+    var currentHoroscope: HoroscopeData? {
+        switch selectedHoroscopeType {
+        case .sun:    return sunHoroscope
+        case .moon:   return moonHoroscope
+        case .rising: return risingHoroscope
+        }
+    }
+
+    /// Returns loading state for currently selected type
+    var isLoadingCurrentHoroscope: Bool {
+        switch selectedHoroscopeType {
+        case .sun:    return isLoadingSunHoroscope
+        case .moon:   return isLoadingMoonHoroscope
+        case .rising: return isLoadingRisingHoroscope
+        }
+    }
+
+    /// Returns error for currently selected type
+    var currentHoroscopeError: String? {
+        switch selectedHoroscopeType {
+        case .sun:    return sunHoroscopeError
+        case .moon:   return moonHoroscopeError
+        case .rising: return risingHoroscopeError
+        }
+    }
 
     // MARK: - User Preferences
     // Backed by a stored property so @Observable tracks changes
@@ -158,6 +222,99 @@ final class DashboardViewModel {
                 print("❌ [HoroscopeCache] API failed and no cache exists for \(sign.displayName)")
                 #endif
             }
+        }
+    }
+
+    // MARK: - Birth Chart Horoscope Fetching
+
+    /// Fetches all three horoscopes (Sun, Moon, Rising) based on the user's birth chart.
+    func fetchBirthChartHoroscopes(birthChart: BirthChart) async {
+        await withTaskGroup(of: Void.self) { group in
+            // Sun sign horoscope
+            if let sunSign = ZodiacSign(fromName: birthChart.sunSign) {
+                group.addTask { await self.fetchHoroscopeForType(.sun, sign: sunSign) }
+            }
+
+            // Moon sign horoscope
+            if let moonSign = ZodiacSign(fromName: birthChart.moonSign) {
+                group.addTask { await self.fetchHoroscopeForType(.moon, sign: moonSign) }
+            }
+
+            // Rising sign horoscope (only if available)
+            if let risingName = birthChart.risingSign,
+               let risingSign = ZodiacSign(fromName: risingName) {
+                group.addTask { await self.fetchHoroscopeForType(.rising, sign: risingSign) }
+            }
+        }
+    }
+
+    /// Fetches a horoscope for a specific type (Sun/Moon/Rising)
+    private func fetchHoroscopeForType(_ type: HoroscopeType, sign: ZodiacSign) async {
+        // Set loading state
+        switch type {
+        case .sun:    isLoadingSunHoroscope = true; sunHoroscopeError = nil
+        case .moon:   isLoadingMoonHoroscope = true; moonHoroscopeError = nil
+        case .rising: isLoadingRisingHoroscope = true; risingHoroscopeError = nil
+        }
+
+        defer {
+            switch type {
+            case .sun:    isLoadingSunHoroscope = false
+            case .moon:   isLoadingMoonHoroscope = false
+            case .rising: isLoadingRisingHoroscope = false
+            }
+        }
+
+        // Check cache first
+        if let cached = HoroscopeCache.cachedToday(for: sign) {
+            let data = HoroscopeData(sign: sign.displayName, horoscope: cached)
+            setHoroscopeData(data, for: type)
+            #if DEBUG
+            print("✅ [BirthChart] Serving cached \(type.rawValue) horoscope for \(sign.displayName)")
+            #endif
+            return
+        }
+
+        // Fetch from API
+        do {
+            let data = try await horoscopeService.fetchHoroscope(for: sign)
+            HoroscopeCache.store(data.horoscope, for: sign)
+            setHoroscopeData(data, for: type)
+        } catch {
+            // Try stale cache
+            if let stale = HoroscopeCache.staleCached(for: sign) {
+                let data = HoroscopeData(sign: sign.displayName, horoscope: stale)
+                setHoroscopeData(data, for: type)
+            } else {
+                setHoroscopeError("Unable to load \(type.rawValue.lowercased()) horoscope.", for: type)
+            }
+        }
+    }
+
+    private func setHoroscopeData(_ data: HoroscopeData, for type: HoroscopeType) {
+        switch type {
+        case .sun:    sunHoroscope = data
+        case .moon:   moonHoroscope = data
+        case .rising: risingHoroscope = data
+        }
+    }
+
+    private func setHoroscopeError(_ error: String, for type: HoroscopeType) {
+        switch type {
+        case .sun:    sunHoroscopeError = error
+        case .moon:   moonHoroscopeError = error
+        case .rising: risingHoroscopeError = error
+        }
+    }
+
+    /// Returns the zodiac sign for a given horoscope type based on birth chart
+    func signForType(_ type: HoroscopeType, birthChart: BirthChart) -> ZodiacSign? {
+        switch type {
+        case .sun:    return ZodiacSign(fromName: birthChart.sunSign)
+        case .moon:   return ZodiacSign(fromName: birthChart.moonSign)
+        case .rising:
+            guard let rising = birthChart.risingSign else { return nil }
+            return ZodiacSign(fromName: rising)
         }
     }
 }

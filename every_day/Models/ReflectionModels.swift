@@ -199,3 +199,72 @@ enum DreamPromptLibrary {
 
 // Keep ReflectionPromptLibrary as a typealias for backwards compatibility
 typealias ReflectionPromptLibrary = DreamPromptLibrary
+
+// MARK: - JournalDailyPrompt (unified across all entry types)
+
+struct JournalDailyPrompt {
+    let text: String
+    let entryType: JournalEntryType
+    /// Present only for dream prompts (carries category + ID for favorites).
+    var dreamPrompt: DreamPrompt? = nil
+}
+
+// MARK: - MoodPromptLibrary
+
+enum MoodPromptLibrary {
+
+    static let all: [String] = [
+        "What triggered this feeling?",
+        "What do you need right now?",
+        "What would shift this mood?",
+        "Who or what are you grateful for right now?",
+        "How has your mood changed throughout today?",
+        "What does your body need in this moment?",
+        "What emotion is underneath this feeling?",
+        "What would feel most nourishing right now?",
+        "What are you resisting or avoiding?",
+        "What small act of self-care could you offer yourself today?",
+        "Is there something you have been afraid to feel?",
+        "What would it look like to fully accept this feeling?",
+        "What is your mood trying to tell you?",
+        "What conversation or interaction has stayed with you today?",
+        "Where do you feel this emotion in your body?",
+        "What would your future self say about this feeling?",
+    ]
+
+    /// Returns a deterministic daily prompt, changes at midnight.
+    static func todaysPrompt() -> String {
+        let dayOrdinal = Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 0
+        return all[dayOrdinal % all.count]
+    }
+}
+
+// MARK: - GeneralPromptLibrary
+
+enum GeneralPromptLibrary {
+
+    static let all: [String] = [
+        "What is on your mind today?",
+        "What made you smile recently?",
+        "What are you looking forward to?",
+        "What did you learn today?",
+        "What do you want to remember about this moment?",
+        "Describe your day in three words, then expand on one of them.",
+        "What surprised you recently?",
+        "What are you grateful for right now?",
+        "What challenge are you working through?",
+        "What creative idea has been on your mind?",
+        "What is something you would like to let go of?",
+        "What conversation has stayed with you lately?",
+        "If today had a theme, what would it be?",
+        "What did you notice today that you might normally walk past?",
+        "What question is living in you right now?",
+        "What would you tell yourself one year from today?",
+    ]
+
+    /// Returns a deterministic daily prompt, changes at midnight.
+    static func todaysPrompt() -> String {
+        let dayOrdinal = Calendar.current.ordinality(of: .day, in: .era, for: .now) ?? 0
+        return all[dayOrdinal % all.count]
+    }
+}

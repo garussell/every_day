@@ -2,6 +2,9 @@
 //  JournalDetailView.swift
 //  every_day
 //
+//  Read-only display for all three journal entry types.
+//  Routes the edit action to the correct editor view based on entryType.
+//
 
 import SwiftUI
 import SwiftData
@@ -23,7 +26,28 @@ struct JournalDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
-                    // ── Date header ────────────────────────────────────────
+                    // ── Entry type badge + Date header ─────────────────────
+                    HStack(spacing: 8) {
+                        // Entry type chip
+                        HStack(spacing: 4) {
+                            Image(systemName: entry.entryTypeEnum.icon)
+                                .font(.caption2.weight(.semibold))
+                            Text(entry.entryTypeEnum.label)
+                                .font(.caption2.weight(.bold))
+                                .kerning(0.5)
+                        }
+                        .foregroundStyle(entry.entryTypeEnum.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(entry.entryTypeEnum.color.opacity(0.15))
+                                .overlay(Capsule().stroke(entry.entryTypeEnum.color.opacity(0.35), lineWidth: 1))
+                        )
+
+                        Spacer()
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.createdAt.formatted(date: .long, time: .omitted))
                             .font(.caption.weight(.semibold))
@@ -42,25 +66,43 @@ struct JournalDetailView: View {
                             .foregroundStyle(.white)
                     }
 
-                    // ── Dream Clarity section ─────────────────────────────
-                    if let clarityLabel = entry.dreamClarityLabel,
+                    // ── Dream Clarity (dream entries only) ─────────────────
+                    if entry.entryTypeEnum == .dream,
+                       let clarityLabel = entry.dreamClarityLabel,
                        let claritySymbol = entry.dreamClaritySymbol {
                         dreamClaritySection(label: clarityLabel, symbol: claritySymbol)
                     }
 
-                    // ── Mood section ───────────────────────────────────────
+                    // ── Mood section (any type that recorded mood) ──────────
                     if entry.hasMoodSelection, let quadrant = entry.quadrantEnum {
                         moodSection(quadrant: quadrant)
                     }
 
-                    // ── Dream body ──────────────────────────────────────────
-                    VStack(alignment: .leading, spacing: 8) {
-                        sectionLabel("Dream")
-                        Text(entry.body)
-                            .font(.body)
-                            .foregroundStyle(.white.opacity(0.88))
-                            .lineSpacing(5)
-                            .fixedSize(horizontal: false, vertical: true)
+                    // ── Energy level (mood entries) ────────────────────────
+                    if entry.entryTypeEnum == .mood, let energy = entry.energyLevel {
+                        energySection(energy: energy)
+                    }
+
+                    // ── Context tags (mood entries) ────────────────────────
+                    if entry.entryTypeEnum == .mood, !entry.contextTagsArray.isEmpty {
+                        tagsSection(tags: entry.contextTagsArray, color: JournalEntryType.mood.color, label: "Context")
+                    }
+
+                    // ── General tags (general entries) ──────────────────────
+                    if entry.entryTypeEnum == .general, !entry.generalTagsArray.isEmpty {
+                        tagsSection(tags: entry.generalTagsArray, color: JournalEntryType.general.color, label: "Tags")
+                    }
+
+                    // ── Body text ───────────────────────────────────────────
+                    if !entry.body.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionLabel(bodyLabel)
+                            Text(entry.body)
+                                .font(.body)
+                                .foregroundStyle(.white.opacity(0.88))
+                                .lineSpacing(5)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
 
                     // ── Edited timestamp ───────────────────────────────────
@@ -96,21 +138,52 @@ struct JournalDetailView: View {
                 }
             }
         }
+        // Route to correct editor based on entry type
         .sheet(isPresented: $showingEditor) {
-            JournalEditorView(entry: entry)
+            switch entry.entryTypeEnum {
+            case .dream:   JournalEditorView(entry: entry)
+            case .mood:    MoodCheckInEditorView(entry: entry)
+            case .general: GeneralEntryEditorView(entry: entry)
+            }
         }
-        .alert("Delete Dream", isPresented: $showDeleteAlert) {
+        .alert(deleteAlertTitle, isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 vm.deleteEntry(entry, in: modelContext)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This dream entry will be permanently deleted.")
+            Text(deleteAlertMessage)
         }
     }
 
-    // MARK: - Dream Clarity section
+    // MARK: - Labels
+
+    private var bodyLabel: String {
+        switch entry.entryTypeEnum {
+        case .dream:   return "Dream"
+        case .mood:    return "Note"
+        case .general: return "Entry"
+        }
+    }
+
+    private var deleteAlertTitle: String {
+        switch entry.entryTypeEnum {
+        case .dream:   return "Delete Dream"
+        case .mood:    return "Delete Check-in"
+        case .general: return "Delete Entry"
+        }
+    }
+
+    private var deleteAlertMessage: String {
+        switch entry.entryTypeEnum {
+        case .dream:   return "This dream entry will be permanently deleted."
+        case .mood:    return "This mood check-in will be permanently deleted."
+        case .general: return "This journal entry will be permanently deleted."
+        }
+    }
+
+    // MARK: - Dream Clarity Section
 
     private func dreamClaritySection(label: String, symbol: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -126,13 +199,12 @@ struct JournalDetailView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white)
 
-                    // Clarity dots
                     HStack(spacing: 4) {
                         ForEach(1...5, id: \.self) { level in
                             Circle()
                                 .fill(level <= (entry.dreamClarity ?? 0)
-                                    ? entry.dreamClarityColor
-                                    : Color.white.opacity(0.15))
+                                      ? entry.dreamClarityColor
+                                      : Color.white.opacity(0.15))
                                 .frame(width: 8, height: 8)
                         }
                     }
@@ -153,15 +225,13 @@ struct JournalDetailView: View {
         }
     }
 
-    // MARK: - Mood section
+    // MARK: - Mood Section
 
     private func moodSection(quadrant: MoodQuadrant) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("Mood")
 
-            // Pill: icon + word + quadrant name
             HStack(spacing: 12) {
-                // Quadrant color indicator
                 RoundedRectangle(cornerRadius: 3)
                     .fill(quadrant.color)
                     .frame(width: 6, height: 40)
@@ -193,7 +263,6 @@ struct JournalDetailView: View {
 
                 Spacer()
 
-                // Mini quadrant position indicator
                 moodPositionDot(quadrant: quadrant)
             }
             .padding(.horizontal, 14)
@@ -209,11 +278,74 @@ struct JournalDetailView: View {
         }
     }
 
-    /// Tiny 40×40 four-quadrant grid showing where the pin was placed.
+    // MARK: - Energy Section
+
+    private func energySection(energy: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Energy Level")
+
+            HStack(spacing: 10) {
+                HStack(spacing: 5) {
+                    ForEach(1...5, id: \.self) { level in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(level <= energy
+                                  ? energyBarColor(energy)
+                                  : Color.white.opacity(0.12))
+                            .frame(width: 28, height: 14)
+                    }
+                }
+
+                Text(energyLabel(energy))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.65))
+
+                Spacer()
+
+                Text("\(energy)/5")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.40))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(JournalEntryType.mood.color.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(JournalEntryType.mood.color.opacity(0.20), lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    // MARK: - Tags Section
+
+    private func tagsSection(tags: [String], color: Color, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(label)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 6) {
+                ForEach(tags, id: \.self) { tag in
+                    Text(tag)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(color.opacity(0.14))
+                                .overlay(Capsule().stroke(color.opacity(0.30), lineWidth: 1))
+                        )
+                }
+            }
+        }
+    }
+
+    // MARK: - Mini Mood Position Dot
+
     private func moodPositionDot(quadrant: MoodQuadrant) -> some View {
         let size: CGFloat = 44
         return ZStack {
-            // Mini quadrant grid
             HStack(spacing: 1) {
                 VStack(spacing: 1) {
                     MoodQuadrant.red.color.opacity(0.7)
@@ -227,7 +359,6 @@ struct JournalDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .frame(width: size, height: size)
 
-            // Pin dot
             Circle()
                 .fill(.white)
                 .frame(width: 8, height: 8)
@@ -240,11 +371,35 @@ struct JournalDetailView: View {
         .frame(width: size, height: size)
     }
 
+    // MARK: - Helpers
+
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.caption.weight(.semibold))
             .foregroundStyle(Color.orbitGold.opacity(0.8))
             .textCase(.uppercase)
             .kerning(0.5)
+    }
+
+    private func energyLabel(_ value: Int) -> String {
+        switch value {
+        case 1: return "Exhausted"
+        case 2: return "Low"
+        case 3: return "Moderate"
+        case 4: return "High"
+        case 5: return "Energized"
+        default: return ""
+        }
+    }
+
+    private func energyBarColor(_ value: Int) -> Color {
+        switch value {
+        case 1: return Color(red: 0.45, green: 0.45, blue: 0.75)
+        case 2: return Color(red: 0.55, green: 0.50, blue: 0.80)
+        case 3: return Color(red: 0.75, green: 0.55, blue: 0.75)
+        case 4: return Color(red: 0.90, green: 0.55, blue: 0.60)
+        case 5: return JournalEntryType.mood.color
+        default: return .white.opacity(0.3)
+        }
     }
 }

@@ -113,4 +113,20 @@ import Foundation
         }
         UserDefaults.standard.set(Array(favoriteIDs), forKey: favoritesKey)
     }
+
+    // MARK: - Unified Daily Prompt
+
+    /// Returns today's daily prompt for the given entry type.
+    /// Dream prompts respect the category filter and new-user onboarding logic.
+    func dailyPrompt(for type: JournalEntryType) -> JournalDailyPrompt {
+        switch type {
+        case .dream:
+            let p = todaysPrompt
+            return JournalDailyPrompt(text: p.text, entryType: .dream, dreamPrompt: p)
+        case .mood:
+            return JournalDailyPrompt(text: MoodPromptLibrary.todaysPrompt(), entryType: .mood)
+        case .general:
+            return JournalDailyPrompt(text: GeneralPromptLibrary.todaysPrompt(), entryType: .general)
+        }
+    }
 }

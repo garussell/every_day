@@ -2,8 +2,9 @@
 //  DailyReflectionCard.swift
 //  every_day
 //
-//  Displays today's dream prompt at the top of the Dream Journal list.
-//  One prompt per day, changes at midnight, can be favorited and shared.
+//  Displays today's daily prompt at the top of the Journal list.
+//  Shows a prompt relevant to the selected entry type.
+//  Dream prompts support favorites; mood and general prompts rotate daily.
 //
 
 import SwiftUI
@@ -16,9 +17,19 @@ struct DailyReflectionCard: View {
 
     @AppStorage("defaultPromptCategory") private var defaultCategory = "all"
 
-    /// Called when the user taps "Reflect" — passes the prompt text as the
-    /// pre-filled title for a new journal entry.
-    var onReflect: (String) -> Void
+    /// The currently selected entry type filter (drives which prompt is shown).
+    var selectedType: JournalEntryType = .dream
+
+    /// Called when the user taps "Reflect" — provides prompt text and its entry type.
+    var onReflect: (String, JournalEntryType) -> Void
+
+    // MARK: - Computed Prompt
+
+    private var dailyPrompt: JournalDailyPrompt {
+        vm.dailyPrompt(for: selectedType)
+    }
+
+    // MARK: - Body
 
     var body: some View {
         OrbitCard(delay: 0, appeared: appeared) {
@@ -26,35 +37,30 @@ struct DailyReflectionCard: View {
 
                 // ── Header row ────────────────────────────────────────────
                 HStack(spacing: 6) {
-                    Image(systemName: vm.todaysPrompt.category.sfSymbol)
-                        .font(.caption2)
-                        .foregroundStyle(vm.todaysPrompt.category.color)
-
-                    Text(vm.todaysPrompt.category.rawValue.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(vm.todaysPrompt.category.color)
-                        .kerning(0.8)
-
-                    Text("· Dream Prompt")
+                    headerIcon
+                    headerLabel
+                    Text("· Daily Prompt")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.38))
 
                     Spacer()
 
-                    // Favorite
-                    Button(action: vm.toggleFavorite) {
-                        Image(systemName: vm.isFavorite ? "heart.fill" : "heart")
-                            .foregroundStyle(
-                                vm.isFavorite
-                                    ? Color(red: 0.95, green: 0.40, blue: 0.45)
-                                    : .white.opacity(0.38)
-                            )
-                            .font(.subheadline)
+                    // Favorite (dream prompts only)
+                    if selectedType == .dream {
+                        Button(action: vm.toggleFavorite) {
+                            Image(systemName: vm.isFavorite ? "heart.fill" : "heart")
+                                .foregroundStyle(
+                                    vm.isFavorite
+                                        ? Color(red: 0.95, green: 0.40, blue: 0.45)
+                                        : .white.opacity(0.38)
+                                )
+                                .font(.subheadline)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
 
                     // Share
-                    ShareLink(item: vm.todaysPrompt.text) {
+                    ShareLink(item: dailyPrompt.text) {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundStyle(.white.opacity(0.38))
                             .font(.subheadline)
@@ -62,7 +68,7 @@ struct DailyReflectionCard: View {
                 }
 
                 // ── Prompt text ───────────────────────────────────────────
-                Text(vm.todaysPrompt.text)
+                Text(dailyPrompt.text)
                     .font(.body.weight(.medium))
                     .foregroundStyle(.white.opacity(0.90))
                     .fixedSize(horizontal: false, vertical: true)
@@ -71,12 +77,12 @@ struct DailyReflectionCard: View {
                 // ── Action row ────────────────────────────────────────────
                 HStack {
                     Button {
-                        onReflect(vm.todaysPrompt.text)
+                        onReflect(dailyPrompt.text, selectedType)
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "moon.zzz.fill")
+                            Image(systemName: selectedType.icon)
                                 .font(.subheadline)
-                            Text("Record Dream")
+                            Text(reflectButtonLabel)
                                 .font(.subheadline.weight(.semibold))
                         }
                         .foregroundStyle(Color.orbitGold)
@@ -95,8 +101,8 @@ struct DailyReflectionCard: View {
 
                     Spacer()
 
-                    // Favorites list link
-                    if !vm.favoritePrompts.isEmpty {
+                    // Favorites list link (dream only)
+                    if selectedType == .dream, !vm.favoritePrompts.isEmpty {
                         Button {
                             showFavorites = true
                         } label: {
@@ -125,8 +131,46 @@ struct DailyReflectionCard: View {
         .sheet(isPresented: $showFavorites) {
             FavoritePromptsView(vm: vm, onReflect: { text in
                 showFavorites = false
-                onReflect(text)
+                onReflect(text, .dream)
             })
+        }
+    }
+
+    // MARK: - Header helpers
+
+    @ViewBuilder
+    private var headerIcon: some View {
+        if selectedType == .dream, let dreamPrompt = dailyPrompt.dreamPrompt {
+            Image(systemName: dreamPrompt.category.sfSymbol)
+                .font(.caption2)
+                .foregroundStyle(dreamPrompt.category.color)
+        } else {
+            Image(systemName: selectedType.icon)
+                .font(.caption2)
+                .foregroundStyle(selectedType.color)
+        }
+    }
+
+    @ViewBuilder
+    private var headerLabel: some View {
+        if selectedType == .dream, let dreamPrompt = dailyPrompt.dreamPrompt {
+            Text(dreamPrompt.category.rawValue.uppercased())
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(dreamPrompt.category.color)
+                .kerning(0.8)
+        } else {
+            Text(selectedType.label.uppercased())
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(selectedType.color)
+                .kerning(0.8)
+        }
+    }
+
+    private var reflectButtonLabel: String {
+        switch selectedType {
+        case .dream:   return "Record Dream"
+        case .mood:    return "Check In"
+        case .general: return "Free Write"
         }
     }
 }
@@ -152,7 +196,7 @@ struct FavoritePromptsView: View {
                         Text("No favorites yet")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.6))
-                        Text("Tap ♡ on a prompt to save it here.")
+                        Text("Tap ♡ on a dream prompt to save it here.")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.38))
                     }
@@ -176,7 +220,7 @@ struct FavoritePromptsView: View {
                             Button {
                                 onReflect(prompt.text)
                             } label: {
-                                Label("Record Dream", systemImage: "moon.zzz.fill")
+                                Label("Record Dream", systemImage: "moon.fill")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(Color.orbitGold)
                             }

@@ -22,6 +22,108 @@ import UserNotifications
         set { _displayName = newValue; UserDefaults.standard.set(newValue, forKey: "displayName") }
     }
 
+    // MARK: - Birth Chart
+
+    private var _birthDate: Date = {
+        (UserDefaults.standard.object(forKey: "birthDate") as? Date)
+            ?? Calendar.current.date(byAdding: .year, value: -25, to: .now)!
+    }()
+
+    var birthDate: Date {
+        get { _birthDate }
+        set { _birthDate = newValue; UserDefaults.standard.set(newValue, forKey: "birthDate") }
+    }
+
+    private var _birthHour: Int = UserDefaults.standard.integer(forKey: "birthHour")
+    var birthHour: Int {
+        get { _birthHour }
+        set { _birthHour = newValue; UserDefaults.standard.set(newValue, forKey: "birthHour") }
+    }
+
+    private var _birthMinute: Int = UserDefaults.standard.integer(forKey: "birthMinute")
+    var birthMinute: Int {
+        get { _birthMinute }
+        set { _birthMinute = newValue; UserDefaults.standard.set(newValue, forKey: "birthMinute") }
+    }
+
+    private var _birthTimeKnown: Bool = UserDefaults.standard.bool(forKey: "birthTimeKnown")
+    var birthTimeKnown: Bool {
+        get { _birthTimeKnown }
+        set { _birthTimeKnown = newValue; UserDefaults.standard.set(newValue, forKey: "birthTimeKnown") }
+    }
+
+    private var _birthPlace: String =
+        UserDefaults.standard.string(forKey: "birthPlace") ?? ""
+
+    var birthPlace: String {
+        get { _birthPlace }
+        set { _birthPlace = newValue; UserDefaults.standard.set(newValue, forKey: "birthPlace") }
+    }
+
+    /// Cached birth chart result (persisted as JSON in UserDefaults)
+    private var _birthChart: BirthChart? = {
+        guard let data = UserDefaults.standard.data(forKey: "birthChart") else { return nil }
+        return try? JSONDecoder().decode(BirthChart.self, from: data)
+    }()
+
+    var birthChart: BirthChart? {
+        get { _birthChart }
+        set {
+            _birthChart = newValue
+            if let chart = newValue, let data = try? JSONEncoder().encode(chart) {
+                UserDefaults.standard.set(data, forKey: "birthChart")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "birthChart")
+            }
+        }
+    }
+
+    /// Whether birth chart has been calculated
+    var hasBirthChart: Bool { _birthChart != nil }
+
+    /// Loading state for birth chart calculation
+    var isCalculatingBirthChart = false
+
+    /// Error message from last calculation attempt
+    var birthChartError: String?
+
+    /// Calculates the birth chart using FreeAstroAPI
+    func calculateBirthChart() async {
+        guard !birthPlace.isEmpty else {
+            birthChartError = "Please enter your birth city."
+            return
+        }
+
+        isCalculatingBirthChart = true
+        birthChartError = nil
+
+        let service = BirthChartService()
+        let components = Calendar.current.dateComponents([.day, .month, .year], from: birthDate)
+
+        do {
+            let chart = try await service.calculateBirthChart(
+                day: components.day ?? 1,
+                month: components.month ?? 1,
+                year: components.year ?? 2000,
+                hour: birthTimeKnown ? birthHour : nil,
+                minute: birthTimeKnown ? birthMinute : nil,
+                city: birthPlace
+            )
+            birthChart = chart
+        } catch let error as BirthChartError {
+            birthChartError = error.errorDescription
+        } catch {
+            birthChartError = "An unexpected error occurred."
+        }
+
+        isCalculatingBirthChart = false
+    }
+
+    /// Clears the saved birth chart
+    func clearBirthChart() {
+        birthChart = nil
+    }
+
     // MARK: - Notifications
 
     private var _reflectionReminderEnabled: Bool =
