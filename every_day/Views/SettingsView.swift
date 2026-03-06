@@ -43,6 +43,7 @@ struct SettingsView: View {
 
                 Form {
                     profileSection
+                    birthChartSection
                     notificationsSection
                     meditationSection
                     journalSection
@@ -119,6 +120,194 @@ struct SettingsView: View {
         .listRowBackground(rowBackground)
     }
 
+    // MARK: - Birth Chart
+
+    private var birthChartSection: some View {
+        Section {
+            // Birth date
+            DatePicker(
+                selection: Binding(
+                    get: { settingsVM.birthDate },
+                    set: { settingsVM.birthDate = $0 }
+                ),
+                displayedComponents: .date
+            ) {
+                Label("Birth Date", systemImage: "calendar")
+                    .foregroundStyle(.white)
+            }
+            .colorScheme(.dark)
+
+            // Birth time known toggle
+            Toggle(isOn: Binding(
+                get: { settingsVM.birthTimeKnown },
+                set: { settingsVM.birthTimeKnown = $0 }
+            )) {
+                Label("I know my birth time", systemImage: "clock.fill")
+                    .foregroundStyle(.white)
+            }
+
+            // Birth time picker (only if known)
+            if settingsVM.birthTimeKnown {
+                HStack {
+                    Label("Birth Time", systemImage: "clock")
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Picker("Hour", selection: Binding(
+                        get: { settingsVM.birthHour },
+                        set: { settingsVM.birthHour = $0 }
+                    )) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text(String(format: "%02d", hour)).tag(hour)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text(":")
+                        .foregroundStyle(.white.opacity(0.5))
+                    Picker("Minute", selection: Binding(
+                        get: { settingsVM.birthMinute },
+                        set: { settingsVM.birthMinute = $0 }
+                    )) {
+                        ForEach(0..<60, id: \.self) { min in
+                            Text(String(format: "%02d", min)).tag(min)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
+
+            // Birth place
+            HStack {
+                Image(systemName: "mappin.and.ellipse")
+                    .foregroundStyle(Color.orbitGold)
+                    .frame(width: 24)
+                TextField("Birth city (e.g., London, UK)", text: Binding(
+                    get: { settingsVM.birthPlace },
+                    set: { settingsVM.birthPlace = $0 }
+                ))
+                .foregroundStyle(.white)
+                .submitLabel(.done)
+            }
+
+            // Calculate button
+            Button {
+                Task {
+                    await settingsVM.calculateBirthChart()
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    if settingsVM.isCalculatingBirthChart {
+                        ProgressView()
+                            .tint(Color.orbitGold)
+                    } else {
+                        Label("Calculate Birth Chart", systemImage: "sparkles")
+                            .fontWeight(.semibold)
+                    }
+                    Spacer()
+                }
+                .foregroundStyle(Color.orbitGold)
+            }
+            .disabled(settingsVM.isCalculatingBirthChart || settingsVM.birthPlace.isEmpty)
+
+            // Error message
+            if let error = settingsVM.birthChartError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red.opacity(0.8))
+            }
+
+            // Results card
+            if let chart = settingsVM.birthChart {
+                birthChartResultsCard(chart)
+            }
+        } header: {
+            sectionHeader("Birth Chart")
+        } footer: {
+            if !settingsVM.birthTimeKnown {
+                Text("Without birth time, Rising sign cannot be calculated.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+        .listRowBackground(rowBackground)
+    }
+
+    private func birthChartResultsCard(_ chart: BirthChart) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "star.circle.fill")
+                    .foregroundStyle(Color.orbitGold)
+                Text("Your Birth Chart")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.orbitGold)
+            }
+
+            // Sun sign
+            HStack {
+                if let sunSign = ZodiacSign(fromName: chart.sunSign) {
+                    Text(sunSign.glyph)
+                        .font(.title2)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sun Sign")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                    Text(chart.sunSign)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+            }
+
+            // Moon sign
+            HStack {
+                if let moonSign = ZodiacSign(fromName: chart.moonSign) {
+                    Text(moonSign.glyph)
+                        .font(.title2)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Moon Sign")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                    Text(chart.moonSign)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+            }
+
+            // Rising sign (only if birth time was known)
+            if let rising = chart.risingSign {
+                HStack {
+                    if let risingSign = ZodiacSign(fromName: rising) {
+                        Text(risingSign.glyph)
+                            .font(.title2)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Rising Sign")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.5))
+                        Text(rising)
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(.white)
+                    }
+                    Spacer()
+                }
+            }
+
+            // Clear button
+            Button(role: .destructive) {
+                settingsVM.clearBirthChart()
+            } label: {
+                Label("Clear Birth Chart", systemImage: "xmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.red.opacity(0.7))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+    }
+
     // MARK: - Zodiac Sign Picker (sub-page)
 
     private var zodiacSignPicker: some View {
@@ -166,7 +355,7 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         Section {
-            // Dream journal reminder toggle
+            // Journal reminder toggle
             Toggle(isOn: Binding(
                 get: { settingsVM.reflectionReminderEnabled },
                 set: { enabled in
@@ -174,7 +363,7 @@ struct SettingsView: View {
                     else       { settingsVM.reflectionReminderEnabled = false }
                 }
             )) {
-                Label("Dream Journal Reminder", systemImage: "moon.zzz.fill")
+                Label("Journal Reminder", systemImage: "book.closed.fill")
                     .foregroundStyle(.white)
             }
 
@@ -259,7 +448,7 @@ struct SettingsView: View {
         .listRowBackground(rowBackground)
     }
 
-    // MARK: - Dream Journal
+    // MARK: - Journal
 
     private var journalSection: some View {
         Section {
@@ -277,11 +466,11 @@ struct SettingsView: View {
             }
 
             Toggle(isOn: $showMoodMeter) {
-                Label("Show Mood Meter in Entries", systemImage: "face.smiling.fill")
+                Label("Show Mood Meter in Dream Entries", systemImage: "face.smiling.fill")
                     .foregroundStyle(.white)
             }
         } header: {
-            sectionHeader("Dream Journal")
+            sectionHeader("Journal")
         }
         .listRowBackground(rowBackground)
     }

@@ -7,6 +7,39 @@ import Foundation
 import SwiftUI
 import SwiftData
 
+// MARK: - JournalEntryType
+
+enum JournalEntryType: String, CaseIterable {
+    case dream   = "dream"
+    case mood    = "mood"
+    case general = "general"
+
+    var label: String {
+        switch self {
+        case .dream:   return "Dream"
+        case .mood:    return "Mood"
+        case .general: return "General"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .dream:   return "moon.fill"
+        case .mood:    return "heart.fill"
+        case .general: return "pencil"
+        }
+    }
+
+    /// Accent color for each entry type.
+    var color: Color {
+        switch self {
+        case .dream:   return Color(red: 0.55, green: 0.45, blue: 0.85)  // deep purple/indigo
+        case .mood:    return Color(red: 0.95, green: 0.50, blue: 0.60)  // coral/pink
+        case .general: return Color(red: 0.35, green: 0.75, blue: 0.65)  // teal/seafoam
+        }
+    }
+}
+
 // MARK: - MoodQuadrant
 
 enum MoodQuadrant: String, CaseIterable {
@@ -197,6 +230,24 @@ final class JournalEntry {
     /// 4 = Most of it, 5 = Vivid and complete.
     var dreamClarity: Int?
 
+    // MARK: Entry Type
+
+    /// Entry type raw value: "dream", "mood", or "general".
+    /// Defaults to "dream" — existing entries migrate as dream entries.
+    var entryType: String = "dream"
+
+    // MARK: Mood Check-In Fields
+
+    /// Energy level 1–5 (1 = Exhausted, 5 = Energized). Mood entries only.
+    var energyLevel: Int?
+    /// Comma-separated context tags (e.g. "Work, Sleep"). Mood entries only.
+    var contextTags: String?
+
+    // MARK: General Entry Fields
+
+    /// Comma-separated free-form tags. General entries only.
+    var generalTags: String?
+
     init(
         title: String = "",
         body: String,
@@ -205,6 +256,10 @@ final class JournalEntry {
         moodQuadrant: String? = nil,
         moodWord: String? = nil,
         dreamClarity: Int? = nil,
+        entryType: String = "dream",
+        energyLevel: Int? = nil,
+        contextTags: String? = nil,
+        generalTags: String? = nil,
         date: Date = .now
     ) {
         self.id           = UUID()
@@ -217,11 +272,32 @@ final class JournalEntry {
         self.moodQuadrant = moodQuadrant
         self.moodWord     = moodWord
         self.dreamClarity = dreamClarity
+        self.entryType    = entryType
+        self.energyLevel  = energyLevel
+        self.contextTags  = contextTags
+        self.generalTags  = generalTags
     }
 
     // MARK: - Computed helpers (not persisted)
 
     var hasMoodSelection: Bool { moodQuadrant != nil }
+
+    /// Typed entry kind, defaulting to .dream if the stored string is unrecognised.
+    var entryTypeEnum: JournalEntryType {
+        JournalEntryType(rawValue: entryType) ?? .dream
+    }
+
+    /// Parsed context tags for mood entries.
+    var contextTagsArray: [String] {
+        guard let raw = contextTags, !raw.isEmpty else { return [] }
+        return raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Parsed free-form tags for general entries.
+    var generalTagsArray: [String] {
+        guard let raw = generalTags, !raw.isEmpty else { return [] }
+        return raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
 
     var quadrantEnum: MoodQuadrant? {
         moodQuadrant.flatMap { MoodQuadrant(rawValue: $0) }
@@ -284,13 +360,28 @@ final class JournalEntry {
     /// Plain-text representation for sharing.
     var shareText: String {
         let dateStr = createdAt.formatted(date: .long, time: .shortened)
-        var lines: [String] = ["🌙 Dream Journal", dateStr]
+        let header: String
+        switch entryTypeEnum {
+        case .dream:   header = "🌙 Dream Journal"
+        case .mood:    header = "😊 Mood Check-in"
+        case .general: header = "📝 Journal Entry"
+        }
+        var lines: [String] = [header, dateStr]
         if !title.isEmpty { lines.append(title) }
-        if let clarityLabel = dreamClarityLabel {
+        if entryTypeEnum == .dream, let clarityLabel = dreamClarityLabel {
             lines.append("Clarity: \(clarityLabel)")
         }
         if let word = moodWord, let quadrant = quadrantEnum {
             lines.append("Mood: \(word) (\(quadrant.title))  \(moodStars)")
+        }
+        if let energy = energyLevel {
+            lines.append("Energy: \(energy)/5")
+        }
+        if !contextTagsArray.isEmpty {
+            lines.append("Tags: \(contextTagsArray.joined(separator: ", "))")
+        }
+        if !generalTagsArray.isEmpty {
+            lines.append("Tags: \(generalTagsArray.joined(separator: ", "))")
         }
         lines += ["", body]
         return lines.joined(separator: "\n")

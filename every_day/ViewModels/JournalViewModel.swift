@@ -42,6 +42,10 @@ final class JournalViewModel {
         moodQuadrant: String? = nil,
         moodWord: String? = nil,
         dreamClarity: Int? = nil,
+        entryType: String = "dream",
+        energyLevel: Int? = nil,
+        contextTags: String? = nil,
+        generalTags: String? = nil,
         date: Date = .now,
         in context: ModelContext
     ) -> JournalEntry {
@@ -53,6 +57,10 @@ final class JournalViewModel {
             moodQuadrant: moodQuadrant,
             moodWord: moodWord,
             dreamClarity: dreamClarity,
+            entryType: entryType,
+            energyLevel: energyLevel,
+            contextTags: contextTags,
+            generalTags: generalTags,
             date: date
         )
         context.insert(entry)
@@ -71,6 +79,10 @@ final class JournalViewModel {
         moodQuadrant: String?,
         moodWord: String?,
         dreamClarity: Int?,
+        entryType: String = "dream",
+        energyLevel: Int? = nil,
+        contextTags: String? = nil,
+        generalTags: String? = nil,
         in context: ModelContext
     ) {
         entry.title        = title
@@ -80,6 +92,10 @@ final class JournalViewModel {
         entry.moodQuadrant = moodQuadrant
         entry.moodWord     = moodWord
         entry.dreamClarity = dreamClarity
+        entry.entryType    = entryType
+        entry.energyLevel  = energyLevel
+        entry.contextTags  = contextTags
+        entry.generalTags  = generalTags
         entry.editedAt     = .now
         save(context)
     }

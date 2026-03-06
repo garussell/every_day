@@ -23,9 +23,12 @@ struct DashboardView: View {
                     headerView
                     WeatherCardView(viewModel: viewModel, appeared: appeared)
                     MoonCardView(viewModel: viewModel, appeared: appeared)
-                    HoroscopeCardView(viewModel: viewModel, appeared: appeared, onChangeStar: {
-                        showZodiacPicker = true
-                    })
+                    HoroscopeCardView(
+                        viewModel: viewModel,
+                        settingsVM: settingsVM,
+                        appeared: appeared,
+                        onChangeStar: { showZodiacPicker = true }
+                    )
                     Spacer(minLength: 30)
                 }
                 .padding(.horizontal, 16)
@@ -62,7 +65,19 @@ struct DashboardView: View {
         }
         .onChange(of: viewModel.locationService.location) { _, newLocation in
             guard let loc = newLocation else { return }
-            Task { await viewModel.onLocationAvailable(loc) }
+            Task {
+                await viewModel.onLocationAvailable(loc)
+                // Fetch birth chart horoscopes if available
+                if let chart = settingsVM.birthChart {
+                    await viewModel.fetchBirthChartHoroscopes(birthChart: chart)
+                }
+            }
+        }
+        .onChange(of: settingsVM.birthChart) { _, newChart in
+            // When birth chart is calculated, fetch all three horoscopes
+            if let chart = newChart {
+                Task { await viewModel.fetchBirthChartHoroscopes(birthChart: chart) }
+            }
         }
     }
 

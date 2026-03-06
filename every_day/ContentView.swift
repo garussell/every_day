@@ -18,7 +18,7 @@ struct ContentView: View {
 
             JournalListView()
                 .tabItem {
-                    Label("Dreams", systemImage: "moon.zzz.fill")
+                    Label("Journal", systemImage: "book.closed.fill")
                 }
 
             MeditationTimerView()
