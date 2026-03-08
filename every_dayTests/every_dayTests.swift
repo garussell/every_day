@@ -149,7 +149,7 @@ struct MoonModelTests {
 
     @Test("MoonData exposes computed phaseName and phaseSymbol")
     func moonDataComputedProperties() {
-        let moon = MoonData(illumination: 50, phase: 0.50, moonrise: "8:00 PM", moonset: "6:00 AM")
+        let moon = MoonData(illumination: 50, phase: 0.50, moonrise: "8:00 PM", moonset: "6:00 AM", nextFullMoon: .now, nextNewMoon: .now, moonZodiacSign: "Virgo")
         #expect(moon.phaseName == "Full Moon")
         #expect(moon.phaseSymbol == "moonphase.full.moon")
     }

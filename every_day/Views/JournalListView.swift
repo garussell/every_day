@@ -52,9 +52,7 @@ struct JournalListView: View {
                 List {
                     // ── Daily prompt card ──────────────────────────────────
                     Section {
-                        DailyReflectionCard(
-                            selectedType: selectedFilter ?? .dream
-                        ) { promptText, entryType in
+                        DailyReflectionCard { promptText, entryType in
                             openEditorFromPrompt(promptText, type: entryType)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))

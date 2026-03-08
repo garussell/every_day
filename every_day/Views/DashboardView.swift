@@ -9,9 +9,10 @@ struct DashboardView: View {
     var viewModel:  DashboardViewModel
     var settingsVM: SettingsViewModel
 
-    @State private var showZodiacPicker = false
-    @State private var showSettings     = false
-    @State private var appeared         = false
+    @State private var showZodiacPicker  = false
+    @State private var showSettings      = false
+    @State private var showBirthChart    = false
+    @State private var appeared          = false
     @State private var sparkleScale: CGFloat = 1.0
 
     var body: some View {
@@ -29,6 +30,9 @@ struct DashboardView: View {
                         appeared: appeared,
                         onChangeStar: { showZodiacPicker = true }
                     )
+                    if settingsVM.hasBirthChart {
+                        birthChartLink
+                    }
                     Spacer(minLength: 30)
                 }
                 .padding(.horizontal, 16)
@@ -53,6 +57,14 @@ struct DashboardView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(settingsVM: settingsVM, dashboardVM: viewModel)
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showBirthChart) {
+            if let chart = settingsVM.birthChart {
+                NavigationStack {
+                    BirthChartDetailView(chart: chart, isSheet: true)
+                }
+                .presentationDragIndicator(.visible)
+            }
         }
         .onAppear {
             viewModel.initialize()
@@ -79,6 +91,25 @@ struct DashboardView: View {
                 Task { await viewModel.fetchBirthChartHoroscopes(birthChart: chart) }
             }
         }
+    }
+
+    // MARK: - Birth Chart Link
+
+    private var birthChartLink: some View {
+        Button {
+            showBirthChart = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10, weight: .medium))
+                Text("View Full Birth Chart")
+                    .font(.footnote)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(Color.orbitGold.opacity(0.8))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Header

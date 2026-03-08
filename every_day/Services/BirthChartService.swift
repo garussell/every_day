@@ -2,7 +2,8 @@
 //  BirthChartService.swift
 //  every_day
 //
-//  Uses the FreeAstroAPI to calculate natal charts (Sun, Moon, Rising signs).
+//  Uses the FreeAstroAPI to calculate natal charts (Sun, Moon, Rising signs,
+//  full planet positions, house cusps).
 //  Docs: https://freeastroapi.com/docs
 //
 //  API KEY SETUP
@@ -15,6 +16,29 @@
 import Foundation
 import CoreLocation
 
+// MARK: - Planet Data Model
+
+/// Full planet position from the natal chart API response.
+struct PlanetData: Codable, Equatable {
+    let id: String          // "sun", "moon", "mercury", "venus", "mars", "jupiter",
+                            // "saturn", "uranus", "neptune", "pluto", "mean_node"
+    let name: String        // "Sun", "Moon", "Mercury", etc.
+    let signId: String      // lowercase full sign name: "cancer", "sagittarius", etc.
+    let pos: Double         // degrees within sign (0–29.99)
+    let absPos: Double      // absolute ecliptic longitude
+    let retrograde: Bool
+    let house: Int          // 1–12 (0 if unavailable)
+}
+
+// MARK: - House Cusp Model
+
+/// One house cusp from the natal chart API response.
+struct HouseCusp: Codable, Equatable {
+    let house: Int          // 1–12
+    let signId: String      // lowercase full sign name
+    let pos: Double         // cusp degree within sign (0–29.99)
+}
+
 // MARK: - Birth Chart Model
 
 struct BirthChart: Codable, Equatable {
@@ -23,46 +47,16 @@ struct BirthChart: Codable, Equatable {
     let risingSign: String?
     let calculatedAt: Date
 
+    // Full chart data — nil for charts calculated before this update.
+    // All optional so existing cached charts continue to decode correctly.
+    let planets: [PlanetData]?
+    let houses: [HouseCusp]?
+    let birthPlace: String?
+    let birthDate: Date?
+
     /// User-friendly display for Rising when it may be nil
     var risingDisplayName: String {
         risingSign ?? "Unknown"
-    }
-}
-
-// MARK: - API Response Models
-
-struct NatalChartResponse: Codable {
-    let planets: [String: PlanetPosition]?
-    let houses: HouseData?
-
-    struct PlanetPosition: Codable {
-        let sign: String?
-        let signNum: Int?
-        let position: Double?
-        let retrograde: Bool?
-
-        enum CodingKeys: String, CodingKey {
-            case sign
-            case signNum = "sign_num"
-            case position
-            case retrograde
-        }
-    }
-
-    struct HouseData: Codable {
-        let ascendant: HousePosition?
-
-        struct HousePosition: Codable {
-            let sign: String?
-            let signNum: Int?
-            let position: Double?
-
-            enum CodingKeys: String, CodingKey {
-                case sign
-                case signNum = "sign_num"
-                case position
-            }
-        }
     }
 }
 
@@ -158,14 +152,6 @@ struct BirthChartService {
     // MARK: - Birth Chart Calculation
 
     /// Calculates the birth chart using FreeAstroAPI.
-    /// - Parameters:
-    ///   - day: Birth day (1-31)
-    ///   - month: Birth month (1-12)
-    ///   - year: Birth year (e.g., 1990)
-    ///   - hour: Birth hour (0-23), nil if unknown
-    ///   - minute: Birth minute (0-59), nil if unknown
-    ///   - city: Birth city name (will be geocoded)
-    /// - Returns: A BirthChart with Sun, Moon, and Rising signs
     func calculateBirthChart(
         day: Int,
         month: Int,
@@ -184,14 +170,14 @@ struct BirthChartService {
         }
 
         // Use noon as default if birth time is unknown
-        let birthHour = hour ?? 12
+        let birthHour   = hour ?? 12
         let birthMinute = minute ?? 0
         let hasBirthTime = hour != nil
 
         // Geocode the city to get coordinates and timezone
         let geoResult = try await geocodeCity(city)
 
-        // Build request — CORRECT ENDPOINT: /api/v1/natal/calculate
+        // Build request
         let url = URL(string: "https://api.freeastroapi.com/api/v1/natal/calculate")!
 
         var request = URLRequest(url: url)
@@ -199,7 +185,6 @@ struct BirthChartService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(key, forHTTPHeaderField: "x-api-key")
 
-        // API requires: name, year, month, day, hour, minute, city, lat, lng, tz_str
         let body: [String: Any] = [
             "name": "User",
             "year": year,
@@ -257,7 +242,7 @@ struct BirthChartService {
         ║  📡 BirthChartService — RESPONSE
         ╠══════════════════════════════════════════════════════════
         ║  Status : \(statusCode)  \(statusCode == 200 ? "✅" : "❌")
-        ║  Body   : \(rawBody.prefix(1500))
+        ║  Body   : \(rawBody.prefix(2000))
         ╚══════════════════════════════════════════════════════════
         """)
         #endif
@@ -266,93 +251,147 @@ struct BirthChartService {
             throw BirthChartError.serverError(statusCode)
         }
 
-        // Parse response - the API returns planetary positions
-        // We need to extract Sun sign, Moon sign, and Ascendant
-        return try parseNatalChart(from: data, hasBirthTime: hasBirthTime)
+        // Build birth date from components (for display in detail view)
+        var comps = DateComponents()
+        comps.day = day; comps.month = month; comps.year = year
+        let birthDateForStorage = Calendar.current.date(from: comps)
+
+        return try parseNatalChart(
+            from: data,
+            hasBirthTime: hasBirthTime,
+            birthPlace: city,
+            birthDate: birthDateForStorage
+        )
     }
 
     // MARK: - Response Parsing
 
-    private func parseNatalChart(from data: Data, hasBirthTime: Bool) throws -> BirthChart {
+    private func parseNatalChart(
+        from data: Data,
+        hasBirthTime: Bool,
+        birthPlace: String,
+        birthDate: Date?
+    ) throws -> BirthChart {
         do {
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-            var sunSign = "Unknown"
-            var moonSign = "Unknown"
+            var sunSign    = "Unknown"
+            var moonSign   = "Unknown"
             var risingSign: String? = nil
+            var planets: [PlanetData] = []
+            var houseCusps: [HouseCusp] = []
 
-            // Try to extract from planets — could be array or dictionary
+            // ── Parse planets (array format — FreeAstroAPI primary format) ───
             if let planetsArray = json?["planets"] as? [[String: Any]] {
-                // Format: [{"name": "Sun", "sign": "Cancer", ...}, ...]
-                for planet in planetsArray {
-                    let name = planet["name"] as? String ?? ""
-                    let sign = planet["sign"] as? String ?? ""
+                for p in planetsArray {
+                    // id field ("sun", "moon", "mean_node", etc.)
+                    let rawId   = p["id"] as? String ?? p["name"] as? String ?? ""
+                    let id      = rawId.lowercased().replacingOccurrences(of: " ", with: "_")
+                    let name    = p["name"] as? String ?? rawId.capitalized
 
-                    if name.lowercased() == "sun" {
-                        sunSign = normalizeSignName(sign)
-                    } else if name.lowercased() == "moon" {
-                        moonSign = normalizeSignName(sign)
-                    }
+                    // sign_id is the primary field; fall back to "sign"
+                    let rawSign = p["sign_id"] as? String
+                                  ?? p["sign"] as? String
+                                  ?? ""
+                    let signId  = normalizeSignId(rawSign)
+
+                    let pos     = p["pos"] as? Double ?? 0
+                    let absPos  = p["abs_pos"] as? Double ?? 0
+
+                    let retrograde: Bool = {
+                        if let b = p["retrograde"] as? Bool   { return b }
+                        if let s = p["retrograde"] as? String { return s.lowercased() == "true" }
+                        if let i = p["retrograde"] as? Int    { return i != 0 }
+                        return false
+                    }()
+
+                    let house = p["house"] as? Int ?? 0
+
+                    guard !id.isEmpty, !signId.isEmpty else { continue }
+
+                    planets.append(PlanetData(
+                        id: id, name: name, signId: signId,
+                        pos: pos, absPos: absPos,
+                        retrograde: retrograde, house: house
+                    ))
+
+                    // Derive basic sun/moon from the planet array
+                    if id == "sun"  { sunSign  = normalizeSignName(signId) }
+                    if id == "moon" { moonSign = normalizeSignName(signId) }
                 }
+
+            // ── Fallback: dict format {"Sun": {"sign": "Cancer", ...}} ──────
             } else if let planetsDict = json?["planets"] as? [String: Any] {
-                // Format: {"Sun": {"sign": "Cancer", ...}, "Moon": {...}}
-                if let sunData = planetsDict["Sun"] as? [String: Any],
-                   let sign = sunData["sign"] as? String {
+                if let sunData  = planetsDict["Sun"]  as? [String: Any],
+                   let sign     = sunData["sign"] as? String {
                     sunSign = normalizeSignName(sign)
                 }
                 if let moonData = planetsDict["Moon"] as? [String: Any],
-                   let sign = moonData["sign"] as? String {
+                   let sign     = moonData["sign"] as? String {
                     moonSign = normalizeSignName(sign)
                 }
             }
 
-            // Extract Rising/Ascendant — only if birth time is known
-            if hasBirthTime {
-                // Try houses.ascendant format
+            // ── Parse houses (array format) ──────────────────────────────────
+            if let housesArray = json?["houses"] as? [[String: Any]] {
+                for h in housesArray {
+                    let houseNum = h["house"] as? Int ?? 0
+                    let rawSign  = h["sign_id"] as? String ?? h["sign"] as? String ?? ""
+                    let signId   = normalizeSignId(rawSign)
+                    let pos      = h["pos"] as? Double ?? 0
+
+                    guard houseNum > 0, !signId.isEmpty else { continue }
+                    houseCusps.append(HouseCusp(house: houseNum, signId: signId, pos: pos))
+                }
+                // Rising from house 1 cusp
+                if let house1 = houseCusps.first(where: { $0.house == 1 }) {
+                    risingSign = normalizeSignName(house1.signId)
+                }
+            }
+
+            // ── Rising fallbacks (dict / legacy formats) ─────────────────────
+            if risingSign == nil, hasBirthTime {
                 if let houses = json?["houses"] as? [String: Any] {
-                    if let ascendant = houses["ascendant"] as? [String: Any],
-                       let sign = ascendant["sign"] as? String {
+                    if let asc  = houses["ascendant"] as? [String: Any],
+                       let sign = asc["sign"] as? String {
                         risingSign = normalizeSignName(sign)
                     } else if let ascSign = houses["Ascendant"] as? String {
                         risingSign = normalizeSignName(ascSign)
                     }
                 }
-
-                // Try houses as array format
-                if risingSign == nil, let housesArray = json?["houses"] as? [[String: Any]] {
-                    for house in housesArray {
-                        let name = house["name"] as? String ?? ""
-                        if name.lowercased().contains("ascendant") || name == "1" || name == "I" {
-                            if let sign = house["sign"] as? String {
-                                risingSign = normalizeSignName(sign)
-                                break
-                            }
-                        }
-                    }
-                }
-
-                // Try first_house format
-                if risingSign == nil, let firstHouse = json?["first_house"] as? [String: Any],
+                if risingSign == nil,
+                   let firstHouse = json?["first_house"] as? [String: Any],
                    let sign = firstHouse["sign"] as? String {
                     risingSign = normalizeSignName(sign)
                 }
-
-                // Try direct ascendant field
-                if risingSign == nil, let ascendant = json?["ascendant"] as? [String: Any],
+                if risingSign == nil,
+                   let ascendant = json?["ascendant"] as? [String: Any],
                    let sign = ascendant["sign"] as? String {
                     risingSign = normalizeSignName(sign)
                 }
             }
 
+            // Strip rising if birth time wasn't provided
+            if !hasBirthTime { risingSign = nil }
+
             #if DEBUG
-            print("✅ [BirthChartService] Parsed — Sun: \(sunSign), Moon: \(moonSign), Rising: \(risingSign ?? "N/A")")
+            print("""
+            ✅ [BirthChartService] Parsed:
+               Sun: \(sunSign) | Moon: \(moonSign) | Rising: \(risingSign ?? "N/A")
+               Planets: \(planets.map { "\($0.name)(\($0.signId))" }.joined(separator: ", "))
+               Houses:  \(houseCusps.map { "H\($0.house):\($0.signId)" }.joined(separator: ", "))
+            """)
             #endif
 
             return BirthChart(
-                sunSign: sunSign,
-                moonSign: moonSign,
-                risingSign: risingSign,
-                calculatedAt: Date()
+                sunSign:      sunSign,
+                moonSign:     moonSign,
+                risingSign:   risingSign,
+                calculatedAt: Date(),
+                planets:      planets.isEmpty ? nil : planets,
+                houses:       houseCusps.isEmpty ? nil : houseCusps,
+                birthPlace:   birthPlace.isEmpty ? nil : birthPlace,
+                birthDate:    birthDate
             )
 
         } catch {
@@ -363,49 +402,35 @@ struct BirthChartService {
         }
     }
 
-    /// Normalizes sign names (handles abbreviations and capitalizes properly)
-    private func normalizeSignName(_ sign: String) -> String {
-        let trimmed = sign.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lowercased = trimmed.lowercased()
+    // MARK: - Sign Helpers
 
-        // Map common abbreviations to full names
+    /// Normalizes a raw sign string to a capitalized full name ("Cancer", "Sagittarius", …)
+    private func normalizeSignName(_ sign: String) -> String {
+        normalizeSignId(sign).capitalized
+    }
+
+    /// Maps any sign string or abbreviation to a lowercase full name ("cancer", "sagittarius", …)
+    private func normalizeSignId(_ raw: String) -> String {
+        let lower = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
         let abbreviations: [String: String] = [
-            "ari": "Aries",
-            "tau": "Taurus",
-            "gem": "Gemini",
-            "can": "Cancer",
-            "leo": "Leo",
-            "vir": "Virgo",
-            "lib": "Libra",
-            "sco": "Scorpio",
-            "sag": "Sagittarius",
-            "cap": "Capricorn",
-            "aqu": "Aquarius",
-            "pis": "Pisces"
+            "ari": "aries",   "tau": "taurus",      "gem": "gemini",
+            "can": "cancer",  "leo": "leo",          "vir": "virgo",
+            "lib": "libra",   "sco": "scorpio",      "sag": "sagittarius",
+            "cap": "capricorn","aqu": "aquarius",    "pis": "pisces"
         ]
 
-        // Check if it's an abbreviation
-        if let fullName = abbreviations[lowercased] {
-            return fullName
-        }
+        let fullNames: Set<String> = [
+            "aries","taurus","gemini","cancer","leo","virgo",
+            "libra","scorpio","sagittarius","capricorn","aquarius","pisces"
+        ]
 
-        // Check if it starts with a known prefix (e.g., "Sag" for Sagittarius)
-        for (abbr, fullName) in abbreviations {
-            if lowercased.hasPrefix(abbr) {
-                return fullName
-            }
-        }
+        if fullNames.contains(lower) { return lower }
+        if let full = abbreviations[lower] { return full }
+        for (abbr, full) in abbreviations where lower.hasPrefix(abbr) { return full }
 
-        // If already a full name, just capitalize it properly
-        let fullNames = ["aries", "taurus", "gemini", "cancer", "leo", "virgo",
-                         "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"]
-
-        if fullNames.contains(lowercased) {
-            return trimmed.capitalized
-        }
-
-        // Return as-is with first letter capitalized
-        return trimmed.isEmpty ? "Unknown" : trimmed.prefix(1).uppercased() + trimmed.dropFirst().lowercased()
+        // Return as-is lowercased if unrecognized
+        return lower
     }
 }
 
