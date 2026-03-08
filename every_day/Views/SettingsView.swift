@@ -295,6 +295,16 @@ struct SettingsView: View {
                 }
             }
 
+            // View full birth chart
+            NavigationLink {
+                BirthChartDetailView(chart: chart)
+                    .preferredColorScheme(.dark)
+            } label: {
+                Label("View Full Birth Chart", systemImage: "star.circle.fill")
+                    .foregroundStyle(Color.orbitGold)
+                    .font(.subheadline.weight(.medium))
+            }
+
             // Clear button
             Button(role: .destructive) {
                 settingsVM.clearBirthChart()

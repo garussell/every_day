@@ -32,6 +32,9 @@ struct MoonData {
     let phase: Double       // 0.0 – 1.0 from Open-Meteo
     let moonrise: String?
     let moonset: String?
+    let nextFullMoon: Date
+    let nextNewMoon: Date
+    let moonZodiacSign: String
 
     var phaseName: String  { MoonHelper.phaseName(for: phase) }
     var phaseSymbol: String { MoonHelper.phaseSymbol(for: phase) }

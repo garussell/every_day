@@ -49,41 +49,51 @@ struct MoonCardView: View {
     }
 
     private func moonContentView(_ moon: MoonData) -> some View {
-        HStack(alignment: .center, spacing: 24) {
-            // Animated moon icon
-            ZStack {
-                Circle()
-                    .fill(Color.moonSilver.opacity(0.08))
-                    .frame(width: 90, height: 90)
-                    .blur(radius: glowPulse ? 18 : 10)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 24) {
+                // Animated moon icon
+                ZStack {
+                    Circle()
+                        .fill(Color.moonSilver.opacity(0.08))
+                        .frame(width: 90, height: 90)
+                        .blur(radius: glowPulse ? 18 : 10)
 
-                Image(systemName: moon.phaseSymbol)
-                    .font(.system(size: 62))
-                    .foregroundStyle(Color.moonSilver)
-                    .shadow(color: Color.moonSilver.opacity(glowPulse ? 0.9 : 0.4),
-                            radius: glowPulse ? 24 : 10)
-                    .scaleEffect(appeared ? 1 : 0.4)
-                    .animation(.spring(dampingFraction: 0.55).delay(0.35), value: appeared)
-            }
-            .frame(width: 90, height: 90)
+                    Image(systemName: moon.phaseSymbol)
+                        .font(.system(size: 62))
+                        .foregroundStyle(Color.moonSilver)
+                        .shadow(color: Color.moonSilver.opacity(glowPulse ? 0.9 : 0.4),
+                                radius: glowPulse ? 24 : 10)
+                        .scaleEffect(appeared ? 1 : 0.4)
+                        .animation(.spring(dampingFraction: 0.55).delay(0.35), value: appeared)
+                }
+                .frame(width: 90, height: 90)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(moon.phaseName)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(moon.phaseName)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
 
-                illuminationBar(moon.illumination)
+                    Text("Moon in \(moon.moonZodiacSign)")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.65))
 
-                HStack(spacing: 16) {
-                    if let rise = moon.moonrise {
-                        riseSetItem(icon: "moonrise.fill", label: "Rise", time: rise)
-                    }
-                    if let set = moon.moonset {
-                        riseSetItem(icon: "moonset.fill",  label: "Set",  time: set)
+                    illuminationBar(moon.illumination)
+
+                    HStack(spacing: 16) {
+                        if let rise = moon.moonrise {
+                            riseSetItem(icon: "moonrise.fill", label: "Rise", time: rise)
+                        }
+                        if let set = moon.moonset {
+                            riseSetItem(icon: "moonset.fill",  label: "Set",  time: set)
+                        }
                     }
                 }
+                Spacer()
             }
-            Spacer()
+
+            // ── Upcoming moon events ─────────────────────────────────
+            upcomingMoonRow(symbol: "moonphase.full.moon", label: "Full Moon", date: moon.nextFullMoon)
+            upcomingMoonRow(symbol: "moonphase.new.moon",  label: "New Moon",  date: moon.nextNewMoon)
         }
     }
 
@@ -120,6 +130,38 @@ struct MoonCardView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.white)
             }
+        }
+    }
+
+    private func upcomingMoonRow(symbol: String, label: String, date: Date) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.caption)
+                .foregroundStyle(Color.moonSilver.opacity(0.7))
+                .frame(width: 16)
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.65))
+            Text("—")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.35))
+            Text(formattedMoonDate(date))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.65))
+            Spacer()
+        }
+    }
+
+    private func formattedMoonDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Today"
+        } else if calendar.isDateInTomorrow(date) {
+            return "Tomorrow"
+        } else {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "MMM d"
+            return fmt.string(from: date)
         }
     }
 
