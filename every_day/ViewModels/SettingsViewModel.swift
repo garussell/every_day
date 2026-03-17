@@ -212,66 +212,54 @@ import UserNotifications
     /// Optimistically turns on the reflection reminder, then checks permission.
     /// Reverts if the user has denied notifications.
     func enableReflectionReminder() {
-        _reflectionReminderEnabled = true
-        UserDefaults.standard.set(true, forKey: "reflectionReminderEnabled")
-
-        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                switch settings.authorizationStatus {
-                case .authorized, .provisional:
-                    self.scheduleReflectionNotification()
-                case .notDetermined:
-                    UNUserNotificationCenter.current()
-                        .requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, _ in
-                            Task { @MainActor [weak self] in
-                                guard let self else { return }
-                                if granted {
-                                    self.scheduleReflectionNotification()
-                                } else {
-                                    self._reflectionReminderEnabled = false
-                                    UserDefaults.standard.set(false, forKey: "reflectionReminderEnabled")
-                                    self.notificationPermissionDenied = true
-                                }
-                            }
-                        }
-                default:
-                    self._reflectionReminderEnabled = false
-                    UserDefaults.standard.set(false, forKey: "reflectionReminderEnabled")
-                    self.notificationPermissionDenied = true
-                }
-            }
-        }
+        enableReminder(
+            enabledKeyPath: \._reflectionReminderEnabled,
+            defaultsKey: "reflectionReminderEnabled",
+            schedule: { self.scheduleNotification(id: "dailyReflection", body: "Your daily reflection is ready ✨", time: self.reflectionReminderTime) }
+        )
     }
 
     /// Optimistically turns on the meditation reminder, then checks permission.
     func enableMeditationReminder() {
-        _meditationReminderEnabled = true
-        UserDefaults.standard.set(true, forKey: "meditationReminderEnabled")
+        enableReminder(
+            enabledKeyPath: \._meditationReminderEnabled,
+            defaultsKey: "meditationReminderEnabled",
+            schedule: { self.scheduleNotification(id: "meditationReminder", body: "Time for your daily meditation 🧘", time: self.meditationReminderTime) }
+        )
+    }
+
+    /// Shared logic for optimistically enabling a reminder with permission checks.
+    private func enableReminder(
+        enabledKeyPath: ReferenceWritableKeyPath<SettingsViewModel, Bool>,
+        defaultsKey: String,
+        schedule: @escaping () -> Void
+    ) {
+        self[keyPath: enabledKeyPath] = true
+        UserDefaults.standard.set(true, forKey: defaultsKey)
 
         UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 switch settings.authorizationStatus {
                 case .authorized, .provisional:
-                    self.scheduleMeditationNotification()
+                    schedule()
                 case .notDetermined:
                     UNUserNotificationCenter.current()
                         .requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, _ in
                             Task { @MainActor [weak self] in
                                 guard let self else { return }
                                 if granted {
-                                    self.scheduleMeditationNotification()
+                                    schedule()
                                 } else {
-                                    self._meditationReminderEnabled = false
-                                    UserDefaults.standard.set(false, forKey: "meditationReminderEnabled")
+                                    self[keyPath: enabledKeyPath] = false
+                                    UserDefaults.standard.set(false, forKey: defaultsKey)
                                     self.notificationPermissionDenied = true
                                 }
                             }
                         }
                 default:
-                    self._meditationReminderEnabled = false
-                    UserDefaults.standard.set(false, forKey: "meditationReminderEnabled")
+                    self[keyPath: enabledKeyPath] = false
+                    UserDefaults.standard.set(false, forKey: defaultsKey)
                     self.notificationPermissionDenied = true
                 }
             }
@@ -280,35 +268,27 @@ import UserNotifications
 
     // MARK: - Private scheduling
 
-    private func scheduleReflectionNotification() {
-        let center  = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: ["dailyReflection"])
-
-        let content       = UNMutableNotificationContent()
-        content.title     = "Daily Orbit"
-        content.body      = "Your daily reflection is ready ✨"
-        content.sound     = .default
-
-        var comps         = Calendar.current.dateComponents([.hour, .minute], from: reflectionReminderTime)
-        comps.second      = 0
-        let trigger       = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-        let request       = UNNotificationRequest(identifier: "dailyReflection", content: content, trigger: trigger)
-        center.add(request)
+    func scheduleReflectionNotification() {
+        scheduleNotification(id: "dailyReflection", body: "Your daily reflection is ready ✨", time: reflectionReminderTime)
     }
 
-    private func scheduleMeditationNotification() {
-        let center  = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: ["meditationReminder"])
+    func scheduleMeditationNotification() {
+        scheduleNotification(id: "meditationReminder", body: "Time for your daily meditation 🧘", time: meditationReminderTime)
+    }
 
-        let content       = UNMutableNotificationContent()
-        content.title     = "Daily Orbit"
-        content.body      = "Time for your daily meditation 🧘"
-        content.sound     = .default
+    private func scheduleNotification(id: String, body: String, time: Date) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [id])
 
-        var comps         = Calendar.current.dateComponents([.hour, .minute], from: meditationReminderTime)
-        comps.second      = 0
-        let trigger       = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-        let request       = UNNotificationRequest(identifier: "meditationReminder", content: content, trigger: trigger)
+        let content   = UNMutableNotificationContent()
+        content.title = "Daily Orbit"
+        content.body  = body
+        content.sound = .default
+
+        var comps     = Calendar.current.dateComponents([.hour, .minute], from: time)
+        comps.second  = 0
+        let trigger   = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+        let request   = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
         center.add(request)
     }
 

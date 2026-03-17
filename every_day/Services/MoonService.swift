@@ -17,15 +17,24 @@ import Foundation
 struct MoonService {
 
     // MARK: - Constants
-    // Reference new moon: January 6, 2000 at 18:14 UTC
-    // Unix timestamp: 946684800 (Jan 1 2000 00:00 UTC)
-    //               + 5 days  × 86400  = 432000
-    //               + 18 hrs  × 3600   = 64800
-    //               + 14 min  × 60     = 840   → 947 182 440
+
+    /// Reference new moon: January 6, 2000 at 18:14 UTC (Unix timestamp).
     private static let referenceNewMoon: TimeInterval = 947_182_440
 
-    // Mean synodic period in seconds (29.530588853 days)
+    /// Mean synodic period in seconds (29.530588853 days).
     private static let synodicPeriod: TimeInterval = 29.530588853 * 86_400
+
+    /// Phase range defining a "full moon" window (centered around 0.50).
+    private static let fullMoonRange: ClosedRange<Double> = 0.47...0.53
+
+    /// Phase range defining a "new moon" window (near 0.0 / 1.0).
+    private static let newMoonThreshold: Double = 0.03
+
+    /// Search step size: 1 hour in seconds.
+    private static let searchStep: TimeInterval = 3600
+
+    /// Maximum search horizon: 35 days in seconds.
+    private static let searchCapDays: TimeInterval = 35 * 86_400
 
     // MARK: - Public interface
     // Signature kept identical to the original so DashboardViewModel needs no changes.
@@ -111,26 +120,21 @@ struct MoonService {
     /// Returns the date of the next full moon after the given date.
     /// Advances in 1-hour steps, skips the current full-moon window, caps at 35 days.
     static func nextFullMoon(after date: Date = Date()) -> Date {
-        let step: TimeInterval = 3600 // 1 hour
-        let cap = date.addingTimeInterval(35 * 86_400)
+        let cap = date.addingTimeInterval(searchCapDays)
         var cursor = date
 
-        // Skip past the current full-moon window (phase 0.47–0.53)
-        let currentPhaseVal = currentPhase(for: date)
-        let inFullWindow = currentPhaseVal >= 0.47 && currentPhaseVal < 0.53
-        if inFullWindow {
+        // Skip past the current full-moon window
+        if fullMoonRange.contains(currentPhase(for: date)) {
             while cursor < cap {
-                cursor = cursor.addingTimeInterval(step)
-                let p = currentPhase(for: cursor)
-                if p < 0.47 || p >= 0.53 { break }
+                cursor = cursor.addingTimeInterval(searchStep)
+                if !fullMoonRange.contains(currentPhase(for: cursor)) { break }
             }
         }
 
         // Advance until we enter the full-moon window
         while cursor < cap {
-            let p = currentPhase(for: cursor)
-            if p >= 0.47 && p < 0.53 { return cursor }
-            cursor = cursor.addingTimeInterval(step)
+            if fullMoonRange.contains(currentPhase(for: cursor)) { return cursor }
+            cursor = cursor.addingTimeInterval(searchStep)
         }
         return cap
     }
@@ -138,26 +142,25 @@ struct MoonService {
     /// Returns the date of the next new moon after the given date.
     /// Advances in 1-hour steps, skips the current new-moon window, caps at 35 days.
     static func nextNewMoon(after date: Date = Date()) -> Date {
-        let step: TimeInterval = 3600 // 1 hour
-        let cap = date.addingTimeInterval(35 * 86_400)
+        let cap = date.addingTimeInterval(searchCapDays)
         var cursor = date
 
-        // Skip past the current new-moon window (phase < 0.03 or >= 0.97)
-        let currentPhaseVal = currentPhase(for: date)
-        let inNewWindow = currentPhaseVal < 0.03 || currentPhaseVal >= 0.97
-        if inNewWindow {
+        func isInNewMoonWindow(_ phase: Double) -> Bool {
+            phase < newMoonThreshold || phase >= (1.0 - newMoonThreshold)
+        }
+
+        // Skip past the current new-moon window
+        if isInNewMoonWindow(currentPhase(for: date)) {
             while cursor < cap {
-                cursor = cursor.addingTimeInterval(step)
-                let p = currentPhase(for: cursor)
-                if p >= 0.03 && p < 0.97 { break }
+                cursor = cursor.addingTimeInterval(searchStep)
+                if !isInNewMoonWindow(currentPhase(for: cursor)) { break }
             }
         }
 
         // Advance until we enter the new-moon window
         while cursor < cap {
-            let p = currentPhase(for: cursor)
-            if p < 0.03 || p >= 0.97 { return cursor }
-            cursor = cursor.addingTimeInterval(step)
+            if isInNewMoonWindow(currentPhase(for: cursor)) { return cursor }
+            cursor = cursor.addingTimeInterval(searchStep)
         }
         return cap
     }

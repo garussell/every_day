@@ -12,6 +12,10 @@ import CoreLocation
 /// Uses an inner NSObject delegate to avoid @Observable + NSObject conflicts.
 @Observable
 final class LocationService {
+    /// Default fallback location (San Francisco) used when location access is denied.
+    static let fallbackLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
+    fileprivate static let fallbackMessage = "Location access denied. Showing data for San Francisco."
+
     var location: CLLocation?
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
     var locationError: String?
@@ -25,6 +29,7 @@ final class LocationService {
         _delegate = d
         manager.delegate = d
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        authorizationStatus = manager.authorizationStatus
     }
 
     func requestLocation() {
@@ -34,8 +39,8 @@ final class LocationService {
         case .authorizedWhenInUse, .authorizedAlways:
             manager.requestLocation()
         case .denied, .restricted:
-            locationError = "Location access denied. Showing data for San Francisco."
-            location = CLLocation(latitude: 37.7749, longitude: -122.4194)
+            locationError = Self.fallbackMessage
+            location = Self.fallbackLocation
         @unknown default:
             break
         }
@@ -60,7 +65,7 @@ private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         service?.locationError = error.localizedDescription
         if service?.location == nil {
-            service?.location = CLLocation(latitude: 37.7749, longitude: -122.4194)
+            service?.location = LocationService.fallbackLocation
         }
     }
 
@@ -70,8 +75,8 @@ private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
         case .authorizedWhenInUse, .authorizedAlways:
             manager.requestLocation()
         case .denied, .restricted:
-            service?.locationError = "Location access denied. Showing data for San Francisco."
-            service?.location = CLLocation(latitude: 37.7749, longitude: -122.4194)
+            service?.locationError = LocationService.fallbackMessage
+            service?.location = LocationService.fallbackLocation
         default:
             break
         }

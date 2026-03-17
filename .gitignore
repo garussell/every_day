@@ -19,8 +19,18 @@ Podfile.lock
 # Secrets — never commit real keys
 # Copy Secrets.swift.template → Secrets.swift, fill in your key, and keep it local.
 every_day/Secrets.swift
+*.env
+*.env.*
+*.local
+*.keychain*
 
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~

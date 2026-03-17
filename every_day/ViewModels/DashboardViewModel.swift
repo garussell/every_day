@@ -42,6 +42,15 @@ final class DashboardViewModel {
     var isLoadingHoroscope = false
     var horoscopeError: String?
 
+    // MARK: - Earth Today State
+    var earthTodayImage: EpicImage?
+    var isLoadingEarthToday = false
+    var earthTodayError: String?
+
+    var shouldShowEarthTodayCard: Bool {
+        isLoadingEarthToday || earthTodayError != nil || earthTodayImage != nil
+    }
+
     // MARK: - Multi-Horoscope State (Birth Chart)
 
     /// Currently selected horoscope type (Sun/Moon/Rising)
@@ -116,11 +125,13 @@ final class DashboardViewModel {
     @ObservationIgnored private let weatherService    = WeatherService()
     @ObservationIgnored private let moonService       = MoonService()
     @ObservationIgnored private let horoscopeService  = HoroscopeService()
+    @ObservationIgnored private let earthService      = NASAEarthService()
 
     // MARK: - Lifecycle
 
     func initialize() {
         locationService.requestLocation()
+        Task { await fetchEarthToday() }
     }
 
     /// Changes the zodiac sign from Settings, clearing the cache first so a
@@ -140,6 +151,7 @@ final class DashboardViewModel {
             group.addTask { await self.fetchWeather(location: location) }
             group.addTask { await self.fetchMoon(location: location) }
             group.addTask { await self.fetchHoroscope(for: self.selectedSign) }
+            group.addTask { await self.fetchEarthToday() }
         }
     }
 
@@ -147,12 +159,14 @@ final class DashboardViewModel {
     func refreshAll() async {
         guard let location = locationService.location else {
             locationService.requestLocation()
+            await fetchEarthToday()
             return
         }
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.fetchWeather(location: location) }
             group.addTask { await self.fetchMoon(location: location) }
             group.addTask { await self.fetchHoroscope(for: self.selectedSign) }
+            group.addTask { await self.fetchEarthToday() }
         }
     }
 
@@ -222,6 +236,19 @@ final class DashboardViewModel {
                 print("❌ [HoroscopeCache] API failed and no cache exists for \(sign.displayName)")
                 #endif
             }
+        }
+    }
+
+    func fetchEarthToday() async {
+        isLoadingEarthToday = true
+        earthTodayError = nil
+        defer { isLoadingEarthToday = false }
+
+        do {
+            earthTodayImage = try await earthService.fetchLatestEarthImage()
+        } catch {
+            earthTodayImage = nil
+            earthTodayError = error.localizedDescription
         }
     }
 

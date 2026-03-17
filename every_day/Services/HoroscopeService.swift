@@ -62,7 +62,6 @@ struct HoroscopeService {
         request.setValue(key, forHTTPHeaderField: "X-Api-Key")
 
         #if DEBUG
-        let keyPreview = key.count > 8 ? String(key.prefix(8)) + "..." : key
         print("""
 
         ╔══════════════════════════════════════════════════════════
@@ -71,7 +70,7 @@ struct HoroscopeService {
         ║  URL       : \(url.absoluteString)
         ║  Method    : GET
         ║  Zodiac    : \(sign.rawValue)
-        ║  X-Api-Key : \(keyPreview)  (length: \(key.count) chars)
+        ║  X-Api-Key : [REDACTED] (length: \(key.count) chars)
         ╚══════════════════════════════════════════════════════════
         """)
         #endif
@@ -93,14 +92,13 @@ struct HoroscopeService {
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
 
         #if DEBUG
-        let rawBody = String(data: data, encoding: .utf8) ?? "<binary / unreadable>"
         print("""
 
         ╔══════════════════════════════════════════════════════════
         ║  📡 HoroscopeService — RESPONSE
         ╠══════════════════════════════════════════════════════════
         ║  Status : \(statusCode)  \(statusCode == 200 ? "✅" : "❌")
-        ║  Body   : \(rawBody)
+        ║  Bytes  : \(data.count)
         ╚══════════════════════════════════════════════════════════
         """)
         #endif

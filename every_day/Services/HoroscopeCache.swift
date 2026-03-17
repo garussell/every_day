@@ -27,12 +27,16 @@ enum HoroscopeCache {
 
     // MARK: - Date Helpers
 
-    /// Today's date as a "yyyy-MM-dd" string in the device's local timezone.
-    private static var todayString: String {
+    private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale     = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: .now)
+        return f
+    }()
+
+    /// Today's date as a "yyyy-MM-dd" string in the device's local timezone.
+    private static var todayString: String {
+        dateFormatter.string(from: .now)
     }
 
     // MARK: - Public API

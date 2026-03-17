@@ -201,7 +201,6 @@ struct BirthChartService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         #if DEBUG
-        let keyPreview = key.count > 8 ? String(key.prefix(8)) + "..." : key
         print("""
 
         ╔══════════════════════════════════════════════════════════
@@ -213,7 +212,7 @@ struct BirthChartService {
         ║  Lat/Lng   : \(geoResult.latitude), \(geoResult.longitude)
         ║  Timezone  : \(geoResult.timezone)
         ║  Date      : \(year)-\(month)-\(day) \(birthHour):\(birthMinute)
-        ║  x-api-key : \(keyPreview)  (length: \(key.count) chars)
+        ║  x-api-key : [REDACTED] (length: \(key.count) chars)
         ╚══════════════════════════════════════════════════════════
         """)
         #endif
@@ -235,14 +234,13 @@ struct BirthChartService {
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
 
         #if DEBUG
-        let rawBody = String(data: data, encoding: .utf8) ?? "<binary / unreadable>"
         print("""
 
         ╔══════════════════════════════════════════════════════════
         ║  📡 BirthChartService — RESPONSE
         ╠══════════════════════════════════════════════════════════
         ║  Status : \(statusCode)  \(statusCode == 200 ? "✅" : "❌")
-        ║  Body   : \(rawBody.prefix(2000))
+        ║  Bytes  : \(data.count)
         ╚══════════════════════════════════════════════════════════
         """)
         #endif

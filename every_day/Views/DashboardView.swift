@@ -23,6 +23,9 @@ struct DashboardView: View {
                 VStack(spacing: 20) {
                     headerView
                     WeatherCardView(viewModel: viewModel, appeared: appeared)
+                    if viewModel.shouldShowEarthTodayCard {
+                        EarthTodayCardView(viewModel: viewModel, appeared: appeared)
+                    }
                     MoonCardView(viewModel: viewModel, appeared: appeared)
                     HoroscopeCardView(
                         viewModel: viewModel,

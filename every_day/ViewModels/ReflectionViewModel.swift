@@ -46,18 +46,20 @@ import Foundation
 
     // MARK: - Category Rotation
 
-    /// Deterministic category for a given day ordinal, respecting weights.
-    private func categoryForDay(_ dayOrdinal: Int) -> DreamCategory {
-        // Build a weighted pool of categories
-        var weightedCategories: [DreamCategory] = []
+    /// Pre-built weighted pool of categories (computed once, reused for every lookup).
+    private static let weightedCategories: [DreamCategory] = {
+        var pool: [DreamCategory] = []
         for cat in DreamCategory.allCases {
             for _ in 0..<cat.weight {
-                weightedCategories.append(cat)
+                pool.append(cat)
             }
         }
+        return pool
+    }()
 
-        // Use day ordinal to pick deterministically
-        return weightedCategories[dayOrdinal % weightedCategories.count]
+    /// Deterministic category for a given day ordinal, respecting weights.
+    private func categoryForDay(_ dayOrdinal: Int) -> DreamCategory {
+        Self.weightedCategories[dayOrdinal % Self.weightedCategories.count]
     }
 
     /// Yesterday's category (for avoiding consecutive same category).

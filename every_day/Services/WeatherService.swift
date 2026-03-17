@@ -8,12 +8,18 @@ import Foundation
 struct WeatherService {
     private let baseURL = "https://api.open-meteo.com/v1/forecast"
 
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     func fetchWeather(latitude: Double, longitude: Double) async throws -> (current: CurrentWeather, forecast: [WeatherDay]) {
         var components = URLComponents(string: baseURL)!
         components.queryItems = [
             URLQueryItem(name: "latitude",         value: String(format: "%.4f", latitude)),
             URLQueryItem(name: "longitude",        value: String(format: "%.4f", longitude)),
-            URLQueryItem(name: "current",          value: "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"),
+            URLQueryItem(name: "current",          value: "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,cloud_cover"),
             URLQueryItem(name: "daily",            value: "weather_code,temperature_2m_max,temperature_2m_min"),
             URLQueryItem(name: "temperature_unit", value: "fahrenheit"),
             URLQueryItem(name: "wind_speed_unit",  value: "mph"),
@@ -35,11 +41,9 @@ struct WeatherService {
             temperature: decoded.current.temperature2m,
             humidity:    decoded.current.relativeHumidity2m,
             windSpeed:   decoded.current.windSpeed10m,
-            weatherCode: decoded.current.weatherCode
+            weatherCode: decoded.current.weatherCode,
+            cloudCover:  decoded.current.cloudCover
         )
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
 
         let forecast = zip(
             decoded.daily.time,
@@ -48,7 +52,7 @@ struct WeatherService {
                     decoded.daily.temperature2mMin))
         ).compactMap { (timeStr, rest) -> WeatherDay? in
             let (code, (maxTemp, minTemp)) = rest
-            guard let date = dateFormatter.date(from: timeStr) else { return nil }
+            guard let date = Self.dateFormatter.date(from: timeStr) else { return nil }
             return WeatherDay(date: date, weatherCode: code, maxTemp: maxTemp, minTemp: minTemp)
         }
 

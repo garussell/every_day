@@ -18,6 +18,7 @@ struct CurrentWeatherData: Codable {
     let relativeHumidity2m: Int
     let windSpeed10m: Double
     let weatherCode: Int
+    let cloudCover: Int?
 
     enum CodingKeys: String, CodingKey {
         case time
@@ -25,6 +26,7 @@ struct CurrentWeatherData: Codable {
         case relativeHumidity2m = "relative_humidity_2m"
         case windSpeed10m = "wind_speed_10m"
         case weatherCode = "weather_code"
+        case cloudCover = "cloud_cover"
     }
 }
 
@@ -49,6 +51,7 @@ struct CurrentWeather {
     let humidity: Int
     let windSpeed: Double
     let weatherCode: Int
+    let cloudCover: Int?
 
     var condition: String { WeatherHelper.condition(for: weatherCode) }
     var symbolName: String { WeatherHelper.symbol(for: weatherCode) }
