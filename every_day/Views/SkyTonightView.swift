@@ -46,6 +46,7 @@ struct SkyTonightView: View {
                 Image(systemName: "location.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.orbitGold)
+                    .accessibilityHidden(true)
 
                 Text(viewModel.locationLabel)
                     .font(.subheadline.weight(.semibold))
@@ -216,6 +217,7 @@ private struct SkyObjectRowView: View {
                     .font(.headline)
                     .foregroundStyle(accentColor)
                     .frame(width: 22)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(object.name)

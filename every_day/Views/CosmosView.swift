@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct CosmosView: View {
+    @AppStorage("cosmos.selectedPlanetTheme") private var selectedPlanetThemeRaw = PlanetTheme.earth.rawValue
     @State private var viewModel = CosmosViewModel()
     @State private var skyTonightViewModel = SkyTonightViewModel()
     @State private var appeared = false
@@ -30,32 +31,59 @@ struct CosmosView: View {
                             )
                         }
 
-                        FeaturedPlanetView(planet: viewModel.featuredPlanet, appeared: appeared)
+                        if shouldShowPlanetSkeleton {
+                            FeaturedPlanetSkeletonView(appeared: appeared)
+                        } else {
+                            FeaturedPlanetView(planet: featuredPlanet, appeared: appeared)
+                                .id(featuredPlanet.id)
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        }
 
                         OrbitCard(delay: 0.12, appeared: appeared) {
                             VStack(alignment: .leading, spacing: 16) {
                                 SpaceSectionHeader(
                                     title: "Planets",
-                                    subtitle: "A calm sweep across the solar system, with mock details ready when live data is quiet."
+                                    subtitle: "Tap a world below to bring it into focus."
                                 )
 
-                                if viewModel.isLoadingPlanets {
-                                    HStack(spacing: 10) {
-                                        ProgressView()
-                                            .tint(Color.orbitGold)
-                                        Text("Refreshing live planet data")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.white.opacity(0.7))
-                                    }
-                                }
-
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 16) {
-                                        ForEach(viewModel.planets) { planet in
-                                            PlanetCardView(planet: planet)
+                                if shouldShowPlanetSkeleton {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 16) {
+                                            ForEach(0..<3, id: \.self) { _ in
+                                                PlanetCardSkeletonView()
+                                            }
                                         }
                                     }
                                     .padding(.vertical, 2)
+                                } else {
+                                    if viewModel.isLoadingPlanets {
+                                        HStack(spacing: 10) {
+                                            ProgressView()
+                                                .tint(Color.orbitGold)
+                                            Text("Refreshing live planet data")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.white.opacity(0.7))
+                                        }
+                                    }
+
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 16) {
+                                            ForEach(viewModel.planets) { planet in
+                                                Button {
+                                                    selectPlanet(planet)
+                                                } label: {
+                                                    PlanetCardView(
+                                                        planet: planet,
+                                                        isSelected: planet.theme == featuredPlanet.theme
+                                                    )
+                                                }
+                                                .buttonStyle(.plain)
+                                                .hoverEffect(.lift)
+                                                .accessibilityLabel("Feature \(planet.displayName)")
+                                            }
+                                        }
+                                        .padding(.vertical, 2)
+                                    }
                                 }
                             }
                         }
@@ -115,15 +143,18 @@ struct CosmosView: View {
                 group.addTask { await viewModel.loadIfNeeded() }
                 group.addTask { await skyTonightViewModel.loadIfNeeded() }
             }
+            syncSelectedPlanetIfNeeded(with: availablePlanets)
             withAnimation(.spring(dampingFraction: 0.8)) {
                 appeared = true
             }
         }
+        .onChange(of: viewModel.planets) { _, planets in
+            syncSelectedPlanetIfNeeded(with: planets)
+        }
     }
 
     private var planetError: String? {
-        guard let planetError = viewModel.planetError else { return nil }
-        return viewModel.hasPlanetFallback ? "\(planetError) Mock planet cards are still available." : planetError
+        viewModel.planetError
     }
 
     private var header: some View {
@@ -141,14 +172,51 @@ struct CosmosView: View {
             Text("A slower orbit through planets, close approaches, and the quiet architecture of the night sky.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.65))
-
-            if viewModel.hasPlanetFallback {
-                Label("Mock details remain available as a graceful fallback.", systemImage: "sparkles")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.58))
-            }
         }
         .padding(.top, 10)
+    }
+
+    private var shouldShowPlanetSkeleton: Bool {
+        viewModel.isLoadingPlanets && !viewModel.hasLoaded
+    }
+
+    private var availablePlanets: [PlanetaryBody] {
+        viewModel.planets.isEmpty ? PlanetaryBody.mockPlanets : viewModel.planets
+    }
+
+    private var selectedPlanetTheme: PlanetTheme? {
+        PlanetTheme(rawValue: selectedPlanetThemeRaw)
+    }
+
+    private var featuredPlanet: PlanetaryBody {
+        if let selectedPlanetTheme,
+           let selectedPlanet = availablePlanets.first(where: { $0.theme == selectedPlanetTheme }) {
+            return selectedPlanet
+        }
+
+        if let earth = availablePlanets.first(where: { $0.theme == .earth }) {
+            return earth
+        }
+
+        return availablePlanets.first ?? PlanetaryBody.mockPlanets[0]
+    }
+
+    private func selectPlanet(_ planet: PlanetaryBody) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            selectedPlanetThemeRaw = planet.theme.rawValue
+        }
+    }
+
+    private func syncSelectedPlanetIfNeeded(with planets: [PlanetaryBody]) {
+        guard !planets.isEmpty else { return }
+
+        if let selectedPlanetTheme,
+           planets.contains(where: { $0.theme == selectedPlanetTheme }) {
+            return
+        }
+
+        selectedPlanetThemeRaw = planets.first(where: { $0.theme == .earth })?.theme.rawValue
+            ?? planets[0].theme.rawValue
     }
 
     private func previewRow(for asteroid: AsteroidApproach) -> some View {
@@ -157,6 +225,7 @@ struct CosmosView: View {
                 .fill(asteroid.isPotentiallyHazardous ? Color.red.opacity(0.8) : Color.orbitGold.opacity(0.85))
                 .frame(width: 10, height: 10)
                 .padding(.top, 5)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(asteroid.name)

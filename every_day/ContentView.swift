@@ -53,7 +53,7 @@ struct ContentView: View {
                 }
         }
         .tint(Color.orbitGold)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(settingsVM.appearanceMode == "system" ? nil : .dark)
     }
 }
 

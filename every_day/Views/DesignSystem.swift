@@ -70,3 +70,80 @@ struct OrbitCard<Content: View>: View {
             .animation(.spring(dampingFraction: 0.78).delay(delay), value: appeared)
     }
 }
+
+// MARK: - Skeletons
+
+struct SkeletonBlock: View {
+    var width: CGFloat? = nil
+    var height: CGFloat
+    var cornerRadius: CGFloat = 12
+
+    @State private var shimmerOffset: CGFloat = -220
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+
+        shape
+            .fill(Color.white.opacity(0.08))
+            .overlay {
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                Color.white.opacity(0.18),
+                                .clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .rotationEffect(.degrees(18))
+                    .offset(x: shimmerOffset)
+            }
+            .clipShape(shape)
+            .frame(width: width, height: height)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+            .onAppear {
+                shimmerOffset = -220
+                withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) {
+                    shimmerOffset = 220
+                }
+            }
+    }
+}
+
+struct SkeletonLine: View {
+    var width: CGFloat? = nil
+    var height: CGFloat = 12
+
+    var body: some View {
+        SkeletonBlock(width: width, height: height, cornerRadius: height / 2)
+    }
+}
+
+// MARK: - Editor Field Helpers
+
+/// Rounded field background used by journal editors.
+/// The stroke color is tinted to match the entry type.
+struct EditorFieldBackground: View {
+    var accentColor: Color = .orbitGold
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.white.opacity(0.07))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(accentColor.opacity(0.20), lineWidth: 1)
+            )
+    }
+}
+
+/// Uppercase section label used by journal editors.
+func editorFieldLabel(_ text: String, color: Color = .orbitGold) -> some View {
+    Text(text)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(color.opacity(0.9))
+        .textCase(.uppercase)
+        .kerning(0.5)
+}

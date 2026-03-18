@@ -98,22 +98,54 @@ final class SkyTonightViewModel {
 
         locationService.requestLocation()
 
-        for _ in 0..<20 {
-            if let location = locationService.location {
-                return location
+        // Build an AsyncStream that yields whenever the observed
+        // LocationService properties change, then check the new state.
+        let stream = AsyncStream<CLLocation?> { continuation in
+            @Sendable func observe() {
+                withObservationTracking {
+                    // Access tracked properties so observation registers them.
+                    _ = self.locationService.location
+                    _ = self.locationService.authorizationStatus
+                } onChange: {
+                    // Schedule the next check on the main actor, then decide
+                    // whether to yield a value or keep observing.
+                    Task { @MainActor in
+                        if let loc = self.locationService.location {
+                            continuation.yield(loc)
+                            continuation.finish()
+                        } else {
+                            switch self.locationService.authorizationStatus {
+                            case .denied, .restricted:
+                                continuation.yield(self.locationService.location)
+                                continuation.finish()
+                            default:
+                                observe()
+                            }
+                        }
+                    }
+                }
             }
-
-            switch locationService.authorizationStatus {
-            case .denied, .restricted:
-                return locationService.location
-            default:
-                break
-            }
-
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            observe()
         }
 
-        return locationService.location
+        // Use a timeout so we don't wait forever.
+        let result = await withTaskGroup(of: CLLocation?.self) { group in
+            group.addTask {
+                for await location in stream {
+                    return location
+                }
+                return nil
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                return self.locationService.location
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+
+        return result
     }
 
     private func applyLocationUnavailableState() {

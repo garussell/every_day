@@ -200,6 +200,8 @@ struct MoodMeterView: View {
     private func gestureLayer(size: CGFloat) -> some View {
         Color.clear
             .contentShape(Rectangle())
+            .accessibilityLabel("Mood meter grid")
+            .accessibilityHint("Tap or drag to select your mood position")
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -225,6 +227,7 @@ struct MoodMeterView: View {
                     Image(systemName: currentQuadrant.sfSymbol)
                         .font(.subheadline)
                         .foregroundStyle(currentQuadrant.color)
+                        .accessibilityHidden(true)
 
                     Text(word.word)
                         .font(.subheadline.weight(.semibold))
@@ -243,6 +246,7 @@ struct MoodMeterView: View {
                          String(repeating: "☆", count: 5 - currentQuadrant.moodScore))
                         .font(.caption)
                         .foregroundStyle(currentQuadrant.color)
+                        .accessibilityLabel("Mood score \(currentQuadrant.moodScore) of 5")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -260,6 +264,7 @@ struct MoodMeterView: View {
                     Image(systemName: "hand.tap")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.35))
+                        .accessibilityHidden(true)
                     Text("Tap or drag to place your mood")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.35))
@@ -275,6 +280,7 @@ struct MoodMeterView: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 8, weight: .semibold))
+                .accessibilityHidden(true)
             Text(text)
                 .font(.system(size: 9, weight: .semibold))
                 .kerning(0.8)

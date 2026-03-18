@@ -64,6 +64,7 @@ struct DailyReflectionCard: View {
                                 .font(.subheadline)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(vm.isFavorite ? "Remove from favorites" : "Add to favorites")
                     }
 
                     // Share
@@ -72,6 +73,7 @@ struct DailyReflectionCard: View {
                             .foregroundStyle(.white.opacity(0.38))
                             .font(.subheadline)
                     }
+                    .accessibilityLabel("Share prompt")
                 }
 
                 // ── Prompt text ──────────────────────────────────────────
@@ -122,6 +124,8 @@ struct DailyReflectionCard: View {
                             .foregroundStyle(Color(red: 0.95, green: 0.40, blue: 0.45).opacity(0.85))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("\(vm.favoritePrompts.count) saved prompts")
+                        .accessibilityHint("View saved dream prompts")
                     }
                 }
             }
@@ -182,6 +186,8 @@ struct DailyReflectionCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(type.label) prompts")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Header helpers
@@ -192,10 +198,12 @@ struct DailyReflectionCard: View {
             Image(systemName: dreamPrompt.category.sfSymbol)
                 .font(.caption2)
                 .foregroundStyle(dreamPrompt.category.color)
+                .accessibilityHidden(true)
         } else {
             Image(systemName: promptType.icon)
                 .font(.caption2)
                 .foregroundStyle(promptType.color)
+                .accessibilityHidden(true)
         }
     }
 

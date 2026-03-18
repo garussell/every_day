@@ -28,6 +28,14 @@ import Foundation
 
 struct HoroscopeService {
 
+    // MARK: - Dependency Injection
+
+    private let session: NetworkSession
+
+    init(session: NetworkSession = URLSession.shared) {
+        self.session = session
+    }
+
     // MARK: - API Key
 
     private static let keychainAccount = "apininjas_horoscope_key"
@@ -80,7 +88,7 @@ struct HoroscopeService {
         let response: URLResponse
 
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             #if DEBUG
             print("❌ [HoroscopeService] Network error: \(error)")

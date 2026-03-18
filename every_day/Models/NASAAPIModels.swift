@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct NASAAPODResponse: Decodable {
+nonisolated struct NASAAPODResponse: Decodable, Sendable {
     let date: String
     let title: String
     let explanation: String
@@ -27,7 +27,7 @@ struct NASAAPODResponse: Decodable {
     }
 }
 
-struct NASANEOFeedResponse: Decodable {
+nonisolated struct NASANEOFeedResponse: Decodable, Sendable {
     let nearEarthObjects: [String: [NASANearEarthObject]]
 
     enum CodingKeys: String, CodingKey {
@@ -35,7 +35,7 @@ struct NASANEOFeedResponse: Decodable {
     }
 }
 
-struct NASANearEarthObject: Decodable {
+nonisolated struct NASANearEarthObject: Decodable, Sendable {
     let id: String
     let name: String
     let estimatedDiameter: NASAEstimatedDiameter
@@ -51,11 +51,11 @@ struct NASANearEarthObject: Decodable {
     }
 }
 
-struct NASAEstimatedDiameter: Decodable {
+nonisolated struct NASAEstimatedDiameter: Decodable, Sendable {
     let kilometers: NASAEstimatedDiameterRange
 }
 
-struct NASAEstimatedDiameterRange: Decodable {
+nonisolated struct NASAEstimatedDiameterRange: Decodable, Sendable {
     let estimatedDiameterMin: Double?
     let estimatedDiameterMax: Double?
 
@@ -65,7 +65,7 @@ struct NASAEstimatedDiameterRange: Decodable {
     }
 }
 
-struct NASACloseApproachData: Decodable {
+nonisolated struct NASACloseApproachData: Decodable, Sendable {
     let closeApproachDate: String?
     let relativeVelocity: NASAStringMetricContainer
     let missDistance: NASAStringMetricContainer
@@ -77,7 +77,7 @@ struct NASACloseApproachData: Decodable {
     }
 }
 
-struct NASAStringMetricContainer: Decodable {
+nonisolated struct NASAStringMetricContainer: Decodable, Sendable {
     let kilometersPerHour: String?
     let kilometers: String?
 

@@ -45,7 +45,6 @@ struct DashboardView: View {
                 await viewModel.refreshAll()
             }
         }
-        .preferredColorScheme(.dark)
         .sheet(isPresented: $showZodiacPicker) {
             ZodiacPickerView(
                 selectedSign: Binding(
@@ -105,14 +104,17 @@ struct DashboardView: View {
             HStack(spacing: 5) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .medium))
+                    .accessibilityHidden(true)
                 Text("View Full Birth Chart")
                     .font(.footnote)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .medium))
+                    .accessibilityHidden(true)
             }
             .foregroundStyle(Color.orbitGold.opacity(0.8))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("View Full Birth Chart")
     }
 
     // MARK: - Header
@@ -163,6 +165,7 @@ struct DashboardView: View {
                     .animation(.spring(response: 0.22, dampingFraction: 0.45), value: sparkleScale)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Settings")
         }
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.4), value: appeared)

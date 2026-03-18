@@ -8,6 +8,7 @@ import SwiftUI
 struct APODHeroView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var expandedAPOD: APODEntry?
 
     let apod: APODEntry
 
@@ -47,43 +48,33 @@ struct APODHeroView: View {
                 }
             }
         }
+        .sheet(item: $expandedAPOD) { apod in
+            APODImageDetailView(apod: apod)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.black)
+        }
     }
 
     @ViewBuilder
     private var heroMedia: some View {
-        if let heroURL = apod.heroURL {
-            AsyncImage(url: heroURL) { phase in
-                switch phase {
-                case let .success(image):
-                    heroMediaContainer {
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: mediaHeight)
-                    }
-                case .failure:
-                    fallbackMedia
-                case .empty:
-                    heroMediaContainer {
-                        ProgressView()
-                            .tint(Color.orbitGold)
-                    }
-                @unknown default:
-                    fallbackMedia
-                }
-            }
-        } else {
-            fallbackMedia
+        switch apod.mediaType {
+        case .image:
+            imageMedia
+        case .video:
+            videoMedia
+        case .unknown:
+            unknownMedia
         }
     }
 
     private var fallbackMedia: some View {
-        heroMediaContainer(alignment: .bottomLeading) {
+        heroMediaContainer(alignment: .bottomLeading, height: mediaHeight) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: apod.mediaType == .video ? "play.rectangle.fill" : "sparkles")
                     .font(.system(size: isPhonePortraitLayout ? 28 : 34))
                     .foregroundStyle(Color.orbitGold)
-                Text(apod.mediaType == .video ? "Video experience" : "Image unavailable")
+                    .accessibilityHidden(true)
+                Text(fallbackTitle)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
             }
@@ -102,6 +93,7 @@ struct APODHeroView: View {
 
     private func heroMediaContainer<Content: View>(
         alignment: Alignment = .center,
+        height: CGFloat,
         @ViewBuilder content: () -> Content
     ) -> some View {
         ZStack(alignment: alignment) {
@@ -118,7 +110,7 @@ struct APODHeroView: View {
                 .padding(isPhonePortraitLayout ? 12 : 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: mediaHeight)
+        .frame(height: height)
         .clipShape(RoundedRectangle(cornerRadius: 26))
         .overlay(alignment: .bottomLeading) {
             mediaBadge
@@ -131,7 +123,18 @@ struct APODHeroView: View {
     }
 
     private var mediaHeight: CGFloat {
-        isPhonePortraitLayout ? 210 : 280
+        let screenWidth = UIScreen.main.bounds.width
+        let screenHeight = UIScreen.main.bounds.height
+
+        if isPhonePortraitLayout {
+            return min(max(screenWidth * 0.92, 340), 380)
+        }
+
+        if horizontalSizeClass == .regular {
+            return min(max(screenHeight * 0.34, 340), 460)
+        }
+
+        return min(max(screenHeight * 0.30, 260), 320)
     }
 
     private var titleFont: Font {
@@ -140,6 +143,251 @@ struct APODHeroView: View {
 
     private var contentSpacing: CGFloat {
         isPhonePortraitLayout ? 12 : 14
+    }
+
+    private var fallbackTitle: String {
+        switch apod.mediaType {
+        case .video:
+            return "Today's APOD is a video"
+        case .image:
+            return "Image couldn't load"
+        case .unknown:
+            return "Media unavailable"
+        }
+    }
+
+    @ViewBuilder
+    private var imageMedia: some View {
+        if let heroURL = apod.heroURL {
+            #if DEBUG
+            let _ = debugLogSelectedURL(heroURL)
+            #endif
+            Button {
+                expandedAPOD = apod
+            } label: {
+                AsyncImage(url: heroURL) { phase in
+                    switch phase {
+                    case let .success(image):
+                        heroMediaContainer(height: mediaHeight) {
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: mediaHeight)
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            Label("Expand", systemImage: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .padding(isPhonePortraitLayout ? 12 : 14)
+                        }
+                    case .failure:
+                        #if DEBUG
+                        let _ = debugLogFallback("AsyncImage failed for \(heroURL.absoluteString)")
+                        #endif
+                        fallbackMedia
+                    case .empty:
+                        heroMediaContainer(height: mediaHeight) {
+                            ProgressView()
+                                .tint(Color.orbitGold)
+                        }
+                    @unknown default:
+                        #if DEBUG
+                        let _ = debugLogFallback("Unknown AsyncImage phase for \(heroURL.absoluteString)")
+                        #endif
+                        fallbackMedia
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Expand Astronomy Picture of the Day image")
+        } else {
+            #if DEBUG
+            let _ = debugLogFallback("No usable image URL for mediaType=image")
+            #endif
+            fallbackMedia
+        }
+    }
+
+    @ViewBuilder
+    private var videoMedia: some View {
+        if let thumbnailURL = apod.thumbnailURL, let linkURL = apod.linkURL {
+            #if DEBUG
+            let _ = debugLogSelectedURL(thumbnailURL)
+            #endif
+            Link(destination: linkURL) {
+                AsyncImage(url: thumbnailURL) { phase in
+                    switch phase {
+                    case let .success(image):
+                        heroMediaContainer(height: mediaHeight) {
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: mediaHeight)
+                        }
+                        .overlay {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: isPhonePortraitLayout ? 64 : 72))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .shadow(color: .black.opacity(0.35), radius: 18, x: 0, y: 6)
+                        }
+                    case .failure:
+                        fallbackMedia
+                    case .empty:
+                        heroMediaContainer(height: mediaHeight) {
+                            ProgressView()
+                                .tint(Color.orbitGold)
+                        }
+                    @unknown default:
+                        fallbackMedia
+                    }
+                }
+            }
+            .accessibilityLabel("Open today's APOD video")
+        } else {
+            #if DEBUG
+            let _ = debugLogFallback("Video APOD has no usable thumbnail")
+            #endif
+            fallbackMedia
+        }
+    }
+
+    @ViewBuilder
+    private var unknownMedia: some View {
+        #if DEBUG
+        let _ = debugLogFallback("Unknown media type with no dedicated renderer")
+        #endif
+        if let heroURL = apod.heroURL {
+            AsyncImage(url: heroURL) { phase in
+                switch phase {
+                case let .success(image):
+                    heroMediaContainer(height: mediaHeight) {
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: mediaHeight)
+                    }
+                default:
+                    fallbackMedia
+                }
+            }
+        } else {
+            fallbackMedia
+        }
+    }
+
+    private func debugLogSelectedURL(_ url: URL) {
+        print("[APODHeroView] mediaType=\(apod.mediaType.rawValue) selectedURL=\(url.absoluteString)")
+    }
+
+    private func debugLogFallback(_ reason: String) {
+        print("[APODHeroView] fallback reason=\(reason)")
+    }
+}
+
+private struct APODImageDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var zoomScale: CGFloat = 1
+    @State private var committedZoomScale: CGFloat = 1
+
+    let apod: APODEntry
+
+    var body: some View {
+        NavigationStack {
+            GeometryReader { proxy in
+                ZStack {
+                    Color.black.ignoresSafeArea()
+
+                    if let imageURL = apod.displayImageURL {
+                        ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                            AsyncImage(url: imageURL) { phase in
+                                switch phase {
+                                case let .success(image):
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(
+                                            width: baseImageSize(for: proxy.size) * zoomScale,
+                                            height: baseImageSize(for: proxy.size) * zoomScale
+                                        )
+                                        .frame(
+                                            minWidth: proxy.size.width,
+                                            minHeight: proxy.size.height - 40
+                                        )
+                                case .failure:
+                                    detailFallback
+                                case .empty:
+                                    ProgressView()
+                                        .tint(Color.orbitGold)
+                                        .frame(
+                                            maxWidth: .infinity,
+                                            minHeight: proxy.size.height - 40
+                                        )
+                                @unknown default:
+                                    detailFallback
+                                }
+                            }
+                        }
+                        .gesture(magnificationGesture)
+                    } else {
+                        detailFallback
+                    }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(apod.title)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text(apod.dateText)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color.orbitGold)
+                }
+            }
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+        }
+    }
+
+    private var magnificationGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                zoomScale = min(max(committedZoomScale * value.magnification, 1), 4)
+            }
+            .onEnded { _ in
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+                    committedZoomScale = zoomScale
+                }
+            }
+    }
+
+    private var detailFallback: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 42))
+                .foregroundStyle(Color.orbitGold.opacity(0.85))
+                .accessibilityHidden(true)
+            Text("APOD image unavailable")
+                .font(.headline)
+                .foregroundStyle(.white.opacity(0.82))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func baseImageSize(for size: CGSize) -> CGFloat {
+        min(size.width - 24, size.height - 80)
     }
 }
 

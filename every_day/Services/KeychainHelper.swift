@@ -49,6 +49,38 @@ enum KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
+    // MARK: - Raw Data
+
+    /// Writes (or overwrites) raw Data for the given account key.
+    @discardableResult
+    static func saveData(_ data: Data, for account: String) -> Bool {
+        delete(for: account)
+
+        let query: [CFString: Any] = [
+            kSecClass:          kSecClassGenericPassword,
+            kSecAttrService:    service,
+            kSecAttrAccount:    account,
+            kSecValueData:      data,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        ]
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    /// Returns the stored Data for the given account key, or nil if not found.
+    static func loadData(for account: String) -> Data? {
+        let query: [CFString: Any] = [
+            kSecClass:       kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+            kSecReturnData:  true,
+            kSecMatchLimit:  kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return data
+    }
+
     /// Deletes the stored item for the given account key.
     @discardableResult
     static func delete(for account: String) -> Bool {

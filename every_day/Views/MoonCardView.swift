@@ -41,6 +41,7 @@ struct MoonCardView: View {
             Image(systemName: "moon.stars.fill")
                 .font(.title3)
                 .foregroundStyle(Color.moonSilver)
+                .accessibilityHidden(true)
             Text("Moon Phase")
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -65,6 +66,7 @@ struct MoonCardView: View {
                                 radius: glowPulse ? 24 : 10)
                         .scaleEffect(appeared ? 1 : 0.4)
                         .animation(.spring(dampingFraction: 0.55).delay(0.35), value: appeared)
+                        .accessibilityLabel(moon.phaseName)
                 }
                 .frame(width: 90, height: 90)
 
@@ -115,6 +117,8 @@ struct MoonCardView: View {
             .frame(height: 6)
         }
         .frame(maxWidth: 160)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Illumination \(pct) percent")
     }
 
     private func riseSetItem(icon: String, label: String, time: String) -> some View {
@@ -122,6 +126,7 @@ struct MoonCardView: View {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundStyle(Color.moonSilver.opacity(0.8))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)
                     .font(.caption2)
@@ -139,6 +144,7 @@ struct MoonCardView: View {
                 .font(.caption)
                 .foregroundStyle(Color.moonSilver.opacity(0.7))
                 .frame(width: 16)
+                .accessibilityHidden(true)
             Text(label)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.white.opacity(0.65))
@@ -177,6 +183,7 @@ struct MoonCardView: View {
     private func errorView(message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                .accessibilityHidden(true)
             Text(message).font(.footnote).foregroundStyle(.white.opacity(0.7))
         }
         .padding(.vertical, 8)

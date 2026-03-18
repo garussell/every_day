@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum PlanetTheme: String, CaseIterable, Hashable {
+nonisolated enum PlanetTheme: String, CaseIterable, Codable, Hashable, Sendable {
     case mercury
     case venus
     case earth
@@ -41,14 +41,18 @@ enum PlanetTheme: String, CaseIterable, Hashable {
             return nil
         }
     }
+
+    var assetImageName: String {
+        "planet_\(rawValue)"
+    }
 }
 
-enum SpaceDataSource: String, Hashable {
+nonisolated enum SpaceDataSource: String, Codable, Hashable, Sendable {
     case mock
     case live
 }
 
-struct PlanetaryBody: Identifiable, Hashable {
+nonisolated struct PlanetaryBody: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let englishName: String
@@ -74,6 +78,10 @@ struct PlanetaryBody: Identifiable, Hashable {
 
     var sourceBadgeText: String {
         dataSource == .live ? "Live data" : "Mock preview"
+    }
+
+    var imageAssetName: String {
+        theme.assetImageName
     }
 
     var radiusText: String {
@@ -342,7 +350,7 @@ struct PlanetaryBody: Identifiable, Hashable {
     }
 }
 
-enum APODMediaType: String, Decodable {
+nonisolated enum APODMediaType: String, Codable, Hashable, Sendable {
     case image
     case video
     case unknown
@@ -352,9 +360,14 @@ enum APODMediaType: String, Decodable {
         let value = (try? container.decode(String.self)) ?? ""
         self = APODMediaType(rawValue: value) ?? .unknown
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
-struct APODEntry: Identifiable, Hashable {
+nonisolated struct APODEntry: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let dateString: String
@@ -377,15 +390,20 @@ struct APODEntry: Identifiable, Hashable {
         return f
     }()
 
-    var heroURL: URL? {
+    var displayImageURL: URL? {
         switch mediaType {
         case .image:
-            return hdURL ?? url
+            // Prefer the standard asset for inline rendering; hdURL can be much larger.
+            return url ?? hdURL
         case .video:
             return thumbnailURL
         case .unknown:
-            return url
+            return url ?? hdURL ?? thumbnailURL
         }
+    }
+
+    var heroURL: URL? {
+        displayImageURL
     }
 
     var dateText: String {
@@ -406,7 +424,7 @@ struct APODEntry: Identifiable, Hashable {
     }
 }
 
-struct AsteroidApproach: Identifiable, Hashable {
+nonisolated struct AsteroidApproach: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let approachDate: Date?
@@ -451,7 +469,7 @@ struct AsteroidApproach: Identifiable, Hashable {
     }
 
     var hazardText: String {
-        isPotentiallyHazardous ? "Potentially hazardous" : "Low hazard"
+        isPotentiallyHazardous ? "Potentially hazardous" : "Not currently hazardous"
     }
 
     private static let numberFormatter: NumberFormatter = {
@@ -466,14 +484,14 @@ struct AsteroidApproach: Identifiable, Hashable {
     }
 }
 
-struct SkyObserverContext: Hashable {
+nonisolated struct SkyObserverContext: Hashable, Sendable {
     let latitude: Double
     let longitude: Double
     let altitudeMeters: Double
     let date: Date
 }
 
-struct SkyTonightPreview: Hashable {
+nonisolated struct SkyTonightPreview: Hashable {
     let title: String
     let message: String
 
@@ -483,6 +501,6 @@ struct SkyTonightPreview: Hashable {
     )
 }
 
-protocol SkyTonightProviding {
+nonisolated protocol SkyTonightProviding {
     func fetchPreview(for observer: SkyObserverContext) async throws -> SkyTonightPreview
 }

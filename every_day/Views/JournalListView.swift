@@ -11,8 +11,6 @@ import SwiftData
 
 struct JournalListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \JournalEntry.createdAt, order: .reverse)
-    private var entries: [JournalEntry]
 
     // MARK: - State
 
@@ -38,8 +36,8 @@ struct JournalListView: View {
     // MARK: - Derived
 
     private var filteredEntries: [JournalEntry] {
-        guard let type = selectedFilter else { return entries }
-        return entries.filter { $0.entryType == type.rawValue }
+        guard let type = selectedFilter else { return vm.paginatedEntries }
+        return vm.paginatedEntries.filter { $0.entryType == type.rawValue }
     }
 
     // MARK: - Body
@@ -92,6 +90,19 @@ struct JournalListView: View {
                         }
                     }
 
+                    // ── Load more sentinel ────────────────────────────────
+                    if vm.hasMoreEntries && selectedFilter == nil {
+                        Section {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .onAppear {
+                                    vm.loadMore(from: modelContext)
+                                }
+                        }
+                    }
+
                     // Bottom padding for FAB
                     Section {
                         Color.clear.frame(height: 70)
@@ -110,6 +121,11 @@ struct JournalListView: View {
             .navigationTitle("Journal")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear {
+                if vm.paginatedEntries.isEmpty {
+                    vm.loadInitialEntries(from: modelContext)
+                }
+            }
         }
         // Type selector bottom sheet
         .sheet(isPresented: $showTypeSelector) {
@@ -124,21 +140,31 @@ struct JournalListView: View {
             .presentationBackground(Color.orbitBackground)
         }
         // Dream editor sheet
-        .sheet(isPresented: $showDreamEditor, onDismiss: { dreamPromptText = nil }) {
+        .sheet(isPresented: $showDreamEditor, onDismiss: {
+            dreamPromptText = nil
+            vm.loadInitialEntries(from: modelContext)
+        }) {
             JournalEditorView(entry: nil, initialTitle: dreamPromptText)
         }
         // Mood editor sheet
-        .sheet(isPresented: $showMoodEditor, onDismiss: { moodPromptText = nil }) {
+        .sheet(isPresented: $showMoodEditor, onDismiss: {
+            moodPromptText = nil
+            vm.loadInitialEntries(from: modelContext)
+        }) {
             MoodCheckInEditorView(entry: nil, initialPrompt: moodPromptText)
         }
         // General editor sheet
-        .sheet(isPresented: $showGeneralEditor, onDismiss: { generalPromptText = nil }) {
+        .sheet(isPresented: $showGeneralEditor, onDismiss: {
+            generalPromptText = nil
+            vm.loadInitialEntries(from: modelContext)
+        }) {
             GeneralEntryEditorView(entry: nil, initialPrompt: generalPromptText)
         }
         // Delete confirmation
         .alert("Delete Entry", isPresented: $showDeleteAlert, presenting: entryToDelete) { entry in
             Button("Delete", role: .destructive) {
                 vm.deleteEntry(entry, in: modelContext)
+                vm.loadInitialEntries(from: modelContext)
             }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
@@ -190,6 +216,8 @@ struct JournalListView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(label) filter")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Empty State
@@ -199,6 +227,7 @@ struct JournalListView: View {
             Image(systemName: selectedFilter?.icon ?? "book.closed.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.orbitGold.opacity(0.30))
+                .accessibilityHidden(true)
 
             Text(emptyStateTitle)
                 .font(.title3.weight(.semibold))
@@ -255,6 +284,8 @@ struct JournalListView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("New journal entry")
+        .accessibilityHint("Choose an entry type to start writing")
     }
 
     // MARK: - Navigation Helpers
@@ -301,6 +332,7 @@ private struct JournalRowView: View {
                 .fill(entry.hasMoodSelection ? entry.quadrantColor : typeColor)
                 .frame(width: 4)
                 .padding(.vertical, 4)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
@@ -308,6 +340,7 @@ private struct JournalRowView: View {
                     Image(systemName: entry.entryTypeEnum.icon)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(typeColor.opacity(0.85))
+                        .accessibilityHidden(true)
 
                     // Date chip
                     Text(entry.shortDate)
@@ -322,6 +355,7 @@ private struct JournalRowView: View {
                         Image(systemName: symbol)
                             .font(.caption2)
                             .foregroundStyle(entry.dreamClarityColor)
+                            .accessibilityLabel("Clarity: \(entry.dreamClarityLabel ?? "")")
                     }
 
                     // Energy level for mood entries
@@ -343,6 +377,7 @@ private struct JournalRowView: View {
                             Image(systemName: quadrant.sfSymbol)
                                 .font(.caption2)
                                 .foregroundStyle(quadrant.color)
+                                .accessibilityHidden(true)
                             Text(word)
                                 .font(.caption2.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.6))
@@ -435,6 +470,7 @@ private struct EntryTypeSelectorSheet: View {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.25))
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -448,6 +484,8 @@ private struct EntryTypeSelectorSheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Create \(type.label) journal entry")
+        .accessibilityHint(entryTypeDescription(type))
     }
 
     private func entryTypeDescription(_ type: JournalEntryType) -> String {
