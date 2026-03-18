@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct EpicImage: Identifiable, Hashable {
+nonisolated struct EpicImage: Codable, Identifiable, Hashable, Sendable {
     let identifier: String
     let caption: String?
     let imageName: String
@@ -47,18 +47,18 @@ struct EpicImage: Identifiable, Hashable {
     }
 }
 
-struct EpicCoordinatePair: Decodable, Hashable {
+nonisolated struct EpicCoordinatePair: Codable, Hashable, Sendable {
     let lat: Double?
     let lon: Double?
 }
 
-struct EpicSatellitePosition: Decodable, Hashable {
+nonisolated struct EpicSatellitePosition: Codable, Hashable, Sendable {
     let x: Double?
     let y: Double?
     let z: Double?
 }
 
-struct EpicImageResponse: Decodable {
+nonisolated struct EpicImageResponse: Codable, Hashable, Sendable {
     let identifier: String
     let caption: String?
     let image: String

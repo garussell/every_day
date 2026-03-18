@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum SpaceServiceError: LocalizedError {
+nonisolated enum SpaceServiceError: LocalizedError {
     case missingSolarSystemToken
     case invalidResponse(statusCode: Int)
 
@@ -19,14 +19,20 @@ enum SpaceServiceError: LocalizedError {
     }
 }
 
-struct SolarSystemService {
+nonisolated struct SolarSystemService {
     private static let keychainAccount = "solar_system_opendata_token"
-    private static let cache = SpaceDataCache()
-    /// Cache TTL for planet data (12 hours — changes infrequently).
-    private static let planetCacheTTL: TimeInterval = 60 * 60 * 12
-
+    private let session: NetworkSession
+    private let cache: SpaceDataCache
     private let bodiesURL = "https://api.le-systeme-solaire.net/rest/bodies/"
     private let positionsURL = "https://api.le-systeme-solaire.net/rest/positions"
+
+    init(
+        session: NetworkSession = URLSession.shared,
+        cache: SpaceDataCache = .shared
+    ) {
+        self.session = session
+        self.cache = cache
+    }
 
     private var bearerToken: String {
         (KeychainHelper.load(for: Self.keychainAccount) ?? "")
@@ -43,13 +49,22 @@ struct SolarSystemService {
     }
 
     func fetchPlanets() async throws -> [PlanetaryBody] {
-        if let cached = await Self.cache.planets() {
-            return cached
-        }
-
         let token = bearerToken
         guard !token.isEmpty else {
             throw SpaceServiceError.missingSolarSystemToken
+        }
+
+        let cacheKey = "solar-system.bodies.planets.reference"
+        let staleValue: SolarSystemBodiesResponse?
+
+        switch await cache.lookup(for: cacheKey, as: SolarSystemBodiesResponse.self) {
+        case let .valid(cached):
+            SpaceDataCacheLogger.log(.validCache, policy: .solarSystemReferenceData, key: cacheKey)
+            return mapPlanets(from: cached)
+        case let .stale(cached):
+            staleValue = cached
+        case .miss:
+            staleValue = nil
         }
 
         var components = URLComponents(string: bodiesURL)!
@@ -67,33 +82,28 @@ struct SolarSystemService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard statusCode == 200 else {
-            throw SpaceServiceError.invalidResponse(statusCode: statusCode)
+        do {
+            let (data, response) = try await session.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            guard statusCode == 200 else {
+                throw SpaceServiceError.invalidResponse(statusCode: statusCode)
+            }
+
+            let decoded = try JSONDecoder().decode(SolarSystemBodiesResponse.self, from: data)
+            SpaceDataCacheLogger.log(
+                staleValue == nil ? .freshNetwork : .expiredCacheRefresh,
+                policy: .solarSystemReferenceData,
+                key: cacheKey
+            )
+            _ = await cache.store(decoded, for: cacheKey, policy: .solarSystemReferenceData)
+            return mapPlanets(from: decoded)
+        } catch {
+            if let staleValue {
+                SpaceDataCacheLogger.log(.staleCacheFallback, policy: .solarSystemReferenceData, key: cacheKey)
+                return mapPlanets(from: staleValue)
+            }
+            throw error
         }
-
-        let decoded = try JSONDecoder().decode(SolarSystemBodiesResponse.self, from: data)
-
-        let fallbackByTheme = Dictionary(uniqueKeysWithValues: PlanetaryBody.mockPlanets.map { ($0.theme, $0) })
-
-        let planets = decoded.bodies
-            .filter { $0.isPlanet ?? false }
-            .compactMap { body -> PlanetaryBody? in
-                let nameForTheme = body.englishName.isEmpty ? body.name : body.englishName
-                let descriptor = PlanetTheme(apiName: nameForTheme)
-                    .flatMap { fallbackByTheme[$0]?.descriptor }
-                    ?? "A quiet world in our solar system."
-                return PlanetaryBody(solarSystemBody: body, descriptor: descriptor)
-            }
-            .sorted { lhs, rhs in
-                let lhsIndex = PlanetTheme.ordered.firstIndex(of: lhs.theme) ?? 0
-                let rhsIndex = PlanetTheme.ordered.firstIndex(of: rhs.theme) ?? 0
-                return lhsIndex < rhsIndex
-            }
-
-        await Self.cache.store(planets: planets, ttl: Self.planetCacheTTL)
-        return planets
     }
 
     func fetchSkyPositions(
@@ -103,6 +113,27 @@ struct SolarSystemService {
         let token = bearerToken
         guard !token.isEmpty else {
             throw SpaceServiceError.missingSolarSystemToken
+        }
+
+        let cacheDate = roundedForCache(observer.date, interval: 60 * 15)
+        let cacheKey = [
+            "solar-system.positions",
+            formattedCoordinate(observer.latitude),
+            formattedCoordinate(observer.longitude),
+            formattedElevation(observer.altitudeMeters),
+            formattedDate(cacheDate, timeZone: timeZone),
+            formattedTimeZoneOffset(for: cacheDate, timeZone: timeZone),
+        ].joined(separator: "|")
+        let staleValue: SkyPositionsResponse?
+
+        switch await cache.lookup(for: cacheKey, as: SkyPositionsResponse.self) {
+        case let .valid(cached):
+            SpaceDataCacheLogger.log(.validCache, policy: .solarSystemSkyPositions, key: cacheKey)
+            return cached.positions.map(\.observation)
+        case let .stale(cached):
+            staleValue = cached
+        case .miss:
+            staleValue = nil
         }
 
         var components = URLComponents(string: positionsURL)!
@@ -120,19 +151,33 @@ struct SolarSystemService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard statusCode == 200 else {
-            throw SpaceServiceError.invalidResponse(statusCode: statusCode)
+        do {
+            let (data, response) = try await session.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            guard statusCode == 200 else {
+                throw SpaceServiceError.invalidResponse(statusCode: statusCode)
+            }
+
+            let decoded = try JSONDecoder().decode(SkyPositionsResponse.self, from: data)
+
+            #if DEBUG
+            print("SkyTonight positions decoded: \(decoded.positions.count)")
+            #endif
+
+            SpaceDataCacheLogger.log(
+                staleValue == nil ? .freshNetwork : .expiredCacheRefresh,
+                policy: .solarSystemSkyPositions,
+                key: cacheKey
+            )
+            _ = await cache.store(decoded, for: cacheKey, policy: .solarSystemSkyPositions)
+            return decoded.positions.map(\.observation)
+        } catch {
+            if let staleValue {
+                SpaceDataCacheLogger.log(.staleCacheFallback, policy: .solarSystemSkyPositions, key: cacheKey)
+                return staleValue.positions.map(\.observation)
+            }
+            throw error
         }
-
-        let decoded = try JSONDecoder().decode(SkyPositionsResponse.self, from: data)
-
-        #if DEBUG
-        print("SkyTonight positions decoded: \(decoded.positions.count)")
-        #endif
-
-        return decoded.positions.map(\.observation)
     }
 
     private func formattedCoordinate(_ value: Double) -> String {
@@ -161,5 +206,29 @@ struct SolarSystemService {
             return String(format: "%.0f", hours)
         }
         return String(format: "%.1f", hours)
+    }
+
+    private func mapPlanets(from response: SolarSystemBodiesResponse) -> [PlanetaryBody] {
+        let fallbackByTheme = Dictionary(uniqueKeysWithValues: PlanetaryBody.mockPlanets.map { ($0.theme, $0) })
+
+        return response.bodies
+            .filter { $0.isPlanet ?? false }
+            .compactMap { body -> PlanetaryBody? in
+                let nameForTheme = body.englishName.isEmpty ? body.name : body.englishName
+                let descriptor = PlanetTheme(apiName: nameForTheme)
+                    .flatMap { fallbackByTheme[$0]?.descriptor }
+                    ?? "A quiet world in our solar system."
+                return PlanetaryBody(solarSystemBody: body, descriptor: descriptor)
+            }
+            .sorted { lhs, rhs in
+                let lhsIndex = PlanetTheme.ordered.firstIndex(of: lhs.theme) ?? 0
+                let rhsIndex = PlanetTheme.ordered.firstIndex(of: rhs.theme) ?? 0
+                return lhsIndex < rhsIndex
+            }
+    }
+
+    private func roundedForCache(_ date: Date, interval: TimeInterval) -> Date {
+        let seconds = floor(date.timeIntervalSinceReferenceDate / interval) * interval
+        return Date(timeIntervalSinceReferenceDate: seconds)
     }
 }

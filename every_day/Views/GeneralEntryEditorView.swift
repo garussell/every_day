@@ -65,6 +65,7 @@ struct GeneralEntryEditorView: View {
                                 .font(.caption)
                                 .foregroundStyle(JournalEntryType.general.color)
                                 .padding(.top, 2)
+                                .accessibilityHidden(true)
                             Text(promptText)
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.75))
@@ -284,19 +285,10 @@ struct GeneralEntryEditorView: View {
     }
 
     private var fieldBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(Color.white.opacity(0.07))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(JournalEntryType.general.color.opacity(0.20), lineWidth: 1)
-            )
+        EditorFieldBackground(accentColor: JournalEntryType.general.color)
     }
 
     private func fieldLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(JournalEntryType.general.color.opacity(0.9))
-            .textCase(.uppercase)
-            .kerning(0.5)
+        editorFieldLabel(text, color: JournalEntryType.general.color)
     }
 }

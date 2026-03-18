@@ -53,7 +53,6 @@ struct BirthChartDetailView: View {
         .navigationTitle("Birth Chart")
         .navigationBarTitleDisplayMode(.large)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .preferredColorScheme(.dark)
         .toolbar {
             if isSheet {
                 ToolbarItem(placement: .confirmationAction) {
@@ -73,6 +72,7 @@ struct BirthChartDetailView: View {
                 Image(systemName: "star.circle.fill")
                     .font(.title2)
                     .foregroundStyle(Color.orbitGold)
+                    .accessibilityHidden(true)
                 Text("Natal Chart")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.white)
@@ -186,6 +186,7 @@ struct BirthChartDetailView: View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.clockwise.circle")
                 .foregroundStyle(Color.orbitGold.opacity(0.6))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Full chart data unavailable")
                     .font(.subheadline.weight(.medium))
@@ -210,10 +211,11 @@ struct BirthChartDetailView: View {
     private func planetRow(_ planet: PlanetData) -> some View {
         HStack(alignment: .center, spacing: 12) {
             // Planet symbol
-            Text(planetSymbol(planet.id))
+            Text(PlanetMetadata.symbol(for: planet.id))
                 .font(.system(size: 20))
-                .foregroundStyle(planetSymbolColor(planet.id))
+                .foregroundStyle(PlanetMetadata.color(for: planet.id))
                 .frame(width: 28, alignment: .center)
+                .accessibilityHidden(true)
 
             // Name + sign + description
             VStack(alignment: .leading, spacing: 2) {
@@ -226,14 +228,15 @@ struct BirthChartDetailView: View {
                         .foregroundStyle(.white.opacity(0.45))
                     Text(planet.signId.capitalized)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(elementColor(planet.signId))
+                        .foregroundStyle(PlanetMetadata.elementColor(for: planet.signId))
                     if planet.retrograde {
                         Text("℞")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Color(red: 0.9, green: 0.4, blue: 0.35))
+                            .accessibilityLabel("Retrograde")
                     }
                 }
-                Text(planetDescription(planet.id))
+                Text(PlanetMetadata.description(for: planet.id))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.4))
             }
@@ -248,9 +251,11 @@ struct BirthChartDetailView: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(.white.opacity(0.08)))
+                    .accessibilityLabel("House \(planet.house)")
             }
         }
         .padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Rising Row (special — no house, no planet data)
@@ -261,6 +266,7 @@ struct BirthChartDetailView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.orbitGold.opacity(0.85))
                 .frame(width: 28, alignment: .center)
+                .accessibilityLabel("Ascendant")
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -272,7 +278,7 @@ struct BirthChartDetailView: View {
                         .foregroundStyle(.white.opacity(0.45))
                     Text(signName)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(elementColor(signName.lowercased()))
+                        .foregroundStyle(PlanetMetadata.elementColor(for: signName.lowercased()))
                 }
                 Text("Outward personality and first impressions")
                     .font(.caption)
@@ -293,6 +299,7 @@ struct BirthChartDetailView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(color)
                 .frame(width: 28, alignment: .center)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -304,7 +311,7 @@ struct BirthChartDetailView: View {
                         .foregroundStyle(.white.opacity(0.45))
                     Text(sign)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(elementColor(sign.lowercased()))
+                        .foregroundStyle(PlanetMetadata.elementColor(for: sign.lowercased()))
                 }
                 Text(desc)
                     .font(.caption)
@@ -341,7 +348,7 @@ struct BirthChartDetailView: View {
             // Sign
             Text(cusp.signId.capitalized)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(elementColor(cusp.signId))
+                .foregroundStyle(PlanetMetadata.elementColor(for: cusp.signId))
 
             // Degree
             Text(String(format: "%.1f°", cusp.pos))
@@ -350,6 +357,8 @@ struct BirthChartDetailView: View {
                 .frame(width: 44, alignment: .trailing)
         }
         .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("House \(cusp.house)\(houseSpecialLabel(cusp.house).map { ", \(houseSpecialLabelFull($0))" } ?? ""), \(cusp.signId.capitalized), \(String(format: "%.1f", cusp.pos)) degrees")
     }
 
     // MARK: - Section Card
@@ -414,77 +423,14 @@ struct BirthChartDetailView: View {
         }
     }
 
-    // MARK: - Planet Metadata
-
-    private func planetSymbol(_ id: String) -> String {
-        switch id {
-        case "sun":                              return "☉"
-        case "moon":                             return "☽"
-        case "mercury":                          return "☿"
-        case "venus":                            return "♀"
-        case "mars":                             return "♂"
-        case "jupiter":                          return "♃"
-        case "saturn":                           return "♄"
-        case "uranus":                           return "♅"
-        case "neptune":                          return "♆"
-        case "pluto":                            return "♇"
-        case "mean_node","true_node","north_node": return "☊"
-        default:                                 return "✦"
+    private func houseSpecialLabelFull(_ abbr: String) -> String {
+        switch abbr {
+        case "ASC": return "Ascendant"
+        case "IC":  return "Imum Coeli"
+        case "DSC": return "Descendant"
+        case "MC":  return "Midheaven"
+        default:    return abbr
         }
     }
 
-    private func planetSymbolColor(_ id: String) -> Color {
-        switch id {
-        case "sun":                                return Color.orbitGold
-        case "moon":                               return .white.opacity(0.85)
-        case "mercury":                            return Color(red: 0.70, green: 0.70, blue: 0.82)
-        case "venus":                              return Color(red: 0.92, green: 0.60, blue: 0.68)
-        case "mars":                               return Color(red: 0.90, green: 0.40, blue: 0.35)
-        case "jupiter":                            return Color(red: 0.82, green: 0.70, blue: 0.50)
-        case "saturn":                             return Color(red: 0.66, green: 0.66, blue: 0.76)
-        case "uranus":                             return Color(red: 0.40, green: 0.80, blue: 0.90)
-        case "neptune":                            return Color(red: 0.40, green: 0.52, blue: 0.92)
-        case "pluto":                              return Color(red: 0.76, green: 0.42, blue: 0.82)
-        case "mean_node","true_node","north_node": return Color(red: 0.55, green: 0.80, blue: 0.50)
-        default:                                   return .white.opacity(0.7)
-        }
-    }
-
-    private func planetDescription(_ id: String) -> String {
-        switch id {
-        case "sun":                                return "Core identity and ego"
-        case "moon":                               return "Emotions and inner self"
-        case "mercury":                            return "Communication and thinking"
-        case "venus":                              return "Love, beauty, and values"
-        case "mars":                               return "Drive, action, and desire"
-        case "jupiter":                            return "Growth, luck, and expansion"
-        case "saturn":                             return "Structure, discipline, and karma"
-        case "uranus":                             return "Change, rebellion, and innovation"
-        case "neptune":                            return "Dreams, intuition, and spirituality"
-        case "pluto":                              return "Transformation and power"
-        case "mean_node","true_node","north_node": return "Life purpose and destiny"
-        default:                                   return ""
-        }
-    }
-
-    // MARK: - Element Color
-
-    private func elementColor(_ signId: String) -> Color {
-        switch signId.lowercased() {
-        // Fire
-        case "aries", "leo", "sagittarius":
-            return Color(red: 0.95, green: 0.65, blue: 0.25)
-        // Earth
-        case "taurus", "virgo", "capricorn":
-            return Color(red: 0.55, green: 0.80, blue: 0.50)
-        // Air
-        case "gemini", "libra", "aquarius":
-            return Color(red: 0.45, green: 0.75, blue: 0.95)
-        // Water
-        case "cancer", "scorpio", "pisces":
-            return Color(red: 0.35, green: 0.68, blue: 0.82)
-        default:
-            return .white.opacity(0.75)
-        }
-    }
 }

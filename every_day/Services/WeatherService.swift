@@ -7,6 +7,11 @@ import Foundation
 
 struct WeatherService {
     private let baseURL = "https://api.open-meteo.com/v1/forecast"
+    private let session: NetworkSession
+
+    init(session: NetworkSession = URLSession.shared) {
+        self.session = session
+    }
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -29,7 +34,7 @@ struct WeatherService {
 
         guard let url = components.url else { throw URLError(.badURL) }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await session.data(from: url)
 
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw URLError(.badServerResponse)

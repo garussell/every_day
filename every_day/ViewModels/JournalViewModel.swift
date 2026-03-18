@@ -16,19 +16,57 @@ final class JournalViewModel {
     // MARK: - State
     var error: String?
 
+    /// Paginated entries currently loaded for display.
+    var paginatedEntries: [JournalEntry] = []
+
+    /// Whether more entries may exist beyond what's loaded.
+    var hasMoreEntries = true
+
+    /// Number of entries to load per page.
+    static let pageSize = 50
+
+    /// Current offset for the next page load.
+    private var currentOffset = 0
+
     // MARK: - Fetch
 
     /// Returns all entries sorted most-recent first.
-    func fetchEntries(from context: ModelContext) -> [JournalEntry] {
-        let descriptor = FetchDescriptor<JournalEntry>(
+    func fetchEntries(
+        from context: ModelContext,
+        limit: Int? = nil,
+        offset: Int = 0
+    ) -> [JournalEntry] {
+        var descriptor = FetchDescriptor<JournalEntry>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
+        if let limit {
+            descriptor.fetchLimit = limit
+            descriptor.fetchOffset = offset
+        }
         do {
             return try context.fetch(descriptor)
         } catch {
             self.error = "Failed to load journal entries."
             return []
         }
+    }
+
+    /// Loads the initial page of entries, resetting pagination state.
+    func loadInitialEntries(from context: ModelContext) {
+        currentOffset = 0
+        let page = fetchEntries(from: context, limit: Self.pageSize, offset: 0)
+        paginatedEntries = page
+        hasMoreEntries = page.count >= Self.pageSize
+        currentOffset = page.count
+    }
+
+    /// Loads the next page and appends to the existing entries.
+    func loadMore(from context: ModelContext) {
+        guard hasMoreEntries else { return }
+        let page = fetchEntries(from: context, limit: Self.pageSize, offset: currentOffset)
+        paginatedEntries.append(contentsOf: page)
+        hasMoreEntries = page.count >= Self.pageSize
+        currentOffset += page.count
     }
 
     // MARK: - Create

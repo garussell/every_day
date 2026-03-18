@@ -32,6 +32,7 @@ struct JournalDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: entry.entryTypeEnum.icon)
                                 .font(.caption2.weight(.semibold))
+                                .accessibilityHidden(true)
                             Text(entry.entryTypeEnum.label)
                                 .font(.caption2.weight(.bold))
                                 .kerning(0.5)
@@ -126,16 +127,19 @@ struct JournalDetailView: View {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(Color.orbitGold)
                 }
+                .accessibilityLabel("Share entry")
                 Button { showingEditor = true } label: {
                     Image(systemName: "pencil")
                         .foregroundStyle(Color.orbitGold)
                 }
+                .accessibilityLabel("Edit entry")
                 Button(role: .destructive) {
                     showDeleteAlert = true
                 } label: {
                     Image(systemName: "trash")
                         .foregroundStyle(.red.opacity(0.8))
                 }
+                .accessibilityLabel("Delete entry")
             }
         }
         // Route to correct editor based on entry type
@@ -193,6 +197,7 @@ struct JournalDetailView: View {
                 Image(systemName: symbol)
                     .font(.title2)
                     .foregroundStyle(entry.dreamClarityColor)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
@@ -208,6 +213,7 @@ struct JournalDetailView: View {
                                 .frame(width: 8, height: 8)
                         }
                     }
+                    .accessibilityHidden(true)
                 }
 
                 Spacer()
@@ -235,12 +241,14 @@ struct JournalDetailView: View {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(quadrant.color)
                     .frame(width: 6, height: 40)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Image(systemName: quadrant.sfSymbol)
                             .font(.subheadline)
                             .foregroundStyle(quadrant.color)
+                            .accessibilityHidden(true)
 
                         Text(entry.moodWord ?? quadrant.title)
                             .font(.headline)
@@ -258,6 +266,7 @@ struct JournalDetailView: View {
                         Text(entry.moodStars)
                             .font(.caption)
                             .foregroundStyle(quadrant.color)
+                            .accessibilityLabel("Mood score \(quadrant.moodScore) of 5")
                     }
                 }
 
@@ -289,13 +298,14 @@ struct JournalDetailView: View {
                     ForEach(1...5, id: \.self) { level in
                         RoundedRectangle(cornerRadius: 3)
                             .fill(level <= energy
-                                  ? energyBarColor(energy)
+                                  ? EnergyLevel.color(for: energy)
                                   : Color.white.opacity(0.12))
                             .frame(width: 28, height: 14)
                     }
                 }
+                .accessibilityHidden(true)
 
-                Text(energyLabel(energy))
+                Text(EnergyLevel.label(for: energy))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.white.opacity(0.65))
 
@@ -369,6 +379,7 @@ struct JournalDetailView: View {
                 )
         }
         .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 
     // MARK: - Helpers
@@ -381,25 +392,4 @@ struct JournalDetailView: View {
             .kerning(0.5)
     }
 
-    private func energyLabel(_ value: Int) -> String {
-        switch value {
-        case 1: return "Exhausted"
-        case 2: return "Low"
-        case 3: return "Moderate"
-        case 4: return "High"
-        case 5: return "Energized"
-        default: return ""
-        }
-    }
-
-    private func energyBarColor(_ value: Int) -> Color {
-        switch value {
-        case 1: return Color(red: 0.45, green: 0.45, blue: 0.75)
-        case 2: return Color(red: 0.55, green: 0.50, blue: 0.80)
-        case 3: return Color(red: 0.75, green: 0.55, blue: 0.75)
-        case 4: return Color(red: 0.90, green: 0.55, blue: 0.60)
-        case 5: return JournalEntryType.mood.color
-        default: return .white.opacity(0.3)
-        }
-    }
 }

@@ -38,6 +38,7 @@ struct WeatherCardView: View {
             Image(systemName: "sun.and.horizon.fill")
                 .font(.title3)
                 .foregroundStyle(Color.orbitGold)
+                .accessibilityHidden(true)
             Text("Weather Forecast")
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -46,6 +47,7 @@ struct WeatherCardView: View {
                 Image(systemName: "location.slash.fill")
                     .foregroundStyle(.orange)
                     .help(locationError)
+                    .accessibilityLabel("Location unavailable: \(locationError)")
             }
         }
     }
@@ -56,6 +58,7 @@ struct WeatherCardView: View {
                 .font(.system(size: 56))
                 .symbolRenderingMode(.multicolor)
                 .shadow(color: Color.orbitGold.opacity(0.4), radius: 12)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(Int(weather.temperature))°F")
@@ -79,6 +82,7 @@ struct WeatherCardView: View {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundStyle(Color.orbitGold.opacity(0.8))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(value)
                     .font(.caption.weight(.semibold))
@@ -100,6 +104,7 @@ struct WeatherCardView: View {
                     Image(systemName: day.symbolName)
                         .font(.system(size: 18))
                         .symbolRenderingMode(.multicolor)
+                        .accessibilityHidden(true)
                     Text("\(Int(day.maxTemp))°")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
@@ -108,25 +113,64 @@ struct WeatherCardView: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(day.dayLabel): high \(Int(day.maxTemp)) degrees, low \(Int(day.minTemp)) degrees")
             }
         }
     }
 
     private var loadingView: some View {
-        HStack {
-            Spacer()
-            ProgressView()
-                .tint(Color.orbitGold)
-                .scaleEffect(1.2)
-            Spacer()
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 20) {
+                SkeletonBlock(width: 68, height: 68, cornerRadius: 20)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    SkeletonLine(width: 110, height: 42)
+                    SkeletonLine(width: 140, height: 14)
+                    SkeletonLine(width: 84, height: 10)
+
+                    HStack(spacing: 16) {
+                        weatherStatSkeleton
+                        weatherStatSkeleton
+                    }
+                }
+
+                Spacer()
+            }
+
+            Divider().background(Color.orbitGold.opacity(0.18))
+
+            HStack(spacing: 0) {
+                ForEach(0..<5, id: \.self) { _ in
+                    VStack(spacing: 8) {
+                        SkeletonLine(width: 24, height: 10)
+                        SkeletonBlock(width: 28, height: 28, cornerRadius: 14)
+                        SkeletonLine(width: 26, height: 11)
+                        SkeletonLine(width: 20, height: 9)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 4)
+    }
+
+    private var weatherStatSkeleton: some View {
+        HStack(spacing: 6) {
+            SkeletonBlock(width: 12, height: 12, cornerRadius: 6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                SkeletonLine(width: 54, height: 10)
+                SkeletonLine(width: 38, height: 8)
+            }
+        }
     }
 
     private func errorView(message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
+                .accessibilityHidden(true)
             Text(message)
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.7))

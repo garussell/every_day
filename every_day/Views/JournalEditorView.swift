@@ -236,20 +236,11 @@ struct JournalEditorView: View {
     }
 
     private var fieldBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(Color.white.opacity(0.07))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.orbitGold.opacity(0.2), lineWidth: 1)
-            )
+        EditorFieldBackground()
     }
 
     private func fieldLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(Color.orbitGold.opacity(0.8))
-            .textCase(.uppercase)
-            .kerning(0.5)
+        editorFieldLabel(text)
     }
 }
 
@@ -295,6 +286,8 @@ private struct DreamClarityPicker: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clarity \(level.value): \(level.label)")
+                    .accessibilityAddTraits(selection == level.value ? .isSelected : [])
                 }
             }
 

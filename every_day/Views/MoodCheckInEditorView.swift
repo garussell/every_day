@@ -67,6 +67,7 @@ struct MoodCheckInEditorView: View {
                                 .font(.caption)
                                 .foregroundStyle(JournalEntryType.mood.color)
                                 .padding(.top, 2)
+                                .accessibilityHidden(true)
                             Text(promptText)
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.75))
@@ -231,6 +232,8 @@ struct MoodCheckInEditorView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(tag)
+                .accessibilityAddTraits(selectedTags.contains(tag) ? .isSelected : [])
             }
         }
     }
@@ -254,6 +257,7 @@ struct MoodCheckInEditorView: View {
                     .font(.title3)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add custom tag")
             .opacity(customTagInput.trimmingCharacters(in: .whitespaces).isEmpty ? 0.35 : 1)
         }
     }
@@ -326,20 +330,11 @@ struct MoodCheckInEditorView: View {
     }
 
     private var fieldBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(Color.white.opacity(0.07))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(JournalEntryType.mood.color.opacity(0.20), lineWidth: 1)
-            )
+        EditorFieldBackground(accentColor: JournalEntryType.mood.color)
     }
 
     private func fieldLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(JournalEntryType.mood.color.opacity(0.9))
-            .textCase(.uppercase)
-            .kerning(0.5)
+        editorFieldLabel(text, color: JournalEntryType.mood.color)
     }
 }
 
@@ -348,29 +343,21 @@ struct MoodCheckInEditorView: View {
 private struct EnergyLevelPicker: View {
     @Binding var selection: Int
 
-    private let levels: [(value: Int, label: String)] = [
-        (1, "Exhausted"),
-        (2, "Low"),
-        (3, "Moderate"),
-        (4, "High"),
-        (5, "Energized"),
-    ]
-
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(levels, id: \.value) { level in
+            ForEach(EnergyLevel.allCases, id: \.rawValue) { level in
                 Button {
                     withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
-                        selection = level.value
+                        selection = level.rawValue
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Text("\(level.value)")
+                        Text("\(level.rawValue)")
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(selection == level.value ? .white : .white.opacity(0.45))
+                            .foregroundStyle(selection == level.rawValue ? .white : .white.opacity(0.45))
                         Text(level.label)
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(selection == level.value ? .white.opacity(0.85) : .white.opacity(0.35))
+                            .foregroundStyle(selection == level.rawValue ? .white.opacity(0.85) : .white.opacity(0.35))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -378,31 +365,22 @@ private struct EnergyLevelPicker: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(selection == level.value
-                                  ? energyColor(level.value)
+                            .fill(selection == level.rawValue
+                                  ? level.color
                                   : Color.white.opacity(0.07))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(selection == level.value
-                                            ? energyColor(level.value).opacity(0.6)
+                                    .stroke(selection == level.rawValue
+                                            ? level.color.opacity(0.6)
                                             : Color.white.opacity(0.12),
                                             lineWidth: 1)
                             )
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Energy level \(level.rawValue): \(level.label)")
+                .accessibilityAddTraits(selection == level.rawValue ? .isSelected : [])
             }
-        }
-    }
-
-    private func energyColor(_ value: Int) -> Color {
-        switch value {
-        case 1: return Color(red: 0.45, green: 0.45, blue: 0.75)  // muted indigo
-        case 2: return Color(red: 0.55, green: 0.50, blue: 0.80)
-        case 3: return Color(red: 0.75, green: 0.55, blue: 0.75)
-        case 4: return Color(red: 0.90, green: 0.55, blue: 0.60)
-        case 5: return JournalEntryType.mood.color
-        default: return .white.opacity(0.3)
         }
     }
 }

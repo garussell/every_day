@@ -12,6 +12,67 @@ import UserNotifications
 
 @Observable final class SettingsViewModel {
 
+    // MARK: - Keychain accounts for birth data
+
+    private enum BirthKeys {
+        static let date       = "birth_date"
+        static let hour       = "birth_hour"
+        static let minute     = "birth_minute"
+        static let timeKnown  = "birth_time_known"
+        static let place      = "birth_place"
+        static let chart      = "birth_chart"
+    }
+
+    // MARK: - One-time migration from UserDefaults → Keychain
+
+    /// Migrates birth data from UserDefaults to Keychain exactly once.
+    /// Guarded by a `didMigrateBirthDataToKeychain` flag in UserDefaults.
+    static func migrateBirthDataToKeychainIfNeeded() {
+        let flag = "didMigrateBirthDataToKeychain"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+
+        let defaults = UserDefaults.standard
+
+        // birthDate (Date → ISO-8601 string)
+        if let date = defaults.object(forKey: "birthDate") as? Date {
+            let encoded = String(date.timeIntervalSince1970)
+            KeychainHelper.save(encoded, for: BirthKeys.date)
+            defaults.removeObject(forKey: "birthDate")
+        }
+
+        // birthHour (Int → string)
+        if defaults.object(forKey: "birthHour") != nil {
+            KeychainHelper.save(String(defaults.integer(forKey: "birthHour")), for: BirthKeys.hour)
+            defaults.removeObject(forKey: "birthHour")
+        }
+
+        // birthMinute (Int → string)
+        if defaults.object(forKey: "birthMinute") != nil {
+            KeychainHelper.save(String(defaults.integer(forKey: "birthMinute")), for: BirthKeys.minute)
+            defaults.removeObject(forKey: "birthMinute")
+        }
+
+        // birthTimeKnown (Bool → string)
+        if defaults.object(forKey: "birthTimeKnown") != nil {
+            KeychainHelper.save(defaults.bool(forKey: "birthTimeKnown") ? "1" : "0", for: BirthKeys.timeKnown)
+            defaults.removeObject(forKey: "birthTimeKnown")
+        }
+
+        // birthPlace (String)
+        if let place = defaults.string(forKey: "birthPlace"), !place.isEmpty {
+            KeychainHelper.save(place, for: BirthKeys.place)
+            defaults.removeObject(forKey: "birthPlace")
+        }
+
+        // birthChart (Data → Keychain raw data)
+        if let chartData = defaults.data(forKey: "birthChart") {
+            KeychainHelper.saveData(chartData, for: BirthKeys.chart)
+            defaults.removeObject(forKey: "birthChart")
+        }
+
+        defaults.set(true, forKey: flag)
+    }
+
     // MARK: - Profile
 
     private var _displayName: String =
@@ -22,47 +83,65 @@ import UserNotifications
         set { _displayName = newValue; UserDefaults.standard.set(newValue, forKey: "displayName") }
     }
 
-    // MARK: - Birth Chart
+    // MARK: - Birth Chart (Keychain-backed)
 
     private var _birthDate: Date = {
-        (UserDefaults.standard.object(forKey: "birthDate") as? Date)
-            ?? Calendar.current.date(byAdding: .year, value: -25, to: .now)!
+        if let raw = KeychainHelper.load(for: BirthKeys.date),
+           let ti = TimeInterval(raw) {
+            return Date(timeIntervalSince1970: ti)
+        }
+        return Calendar.current.date(byAdding: .year, value: -25, to: .now)!
     }()
 
     var birthDate: Date {
         get { _birthDate }
-        set { _birthDate = newValue; UserDefaults.standard.set(newValue, forKey: "birthDate") }
+        set {
+            _birthDate = newValue
+            KeychainHelper.save(String(newValue.timeIntervalSince1970), for: BirthKeys.date)
+        }
     }
 
-    private var _birthHour: Int = UserDefaults.standard.integer(forKey: "birthHour")
+    private var _birthHour: Int = {
+        if let raw = KeychainHelper.load(for: BirthKeys.hour), let val = Int(raw) { return val }
+        return 0
+    }()
+
     var birthHour: Int {
         get { _birthHour }
-        set { _birthHour = newValue; UserDefaults.standard.set(newValue, forKey: "birthHour") }
+        set { _birthHour = newValue; KeychainHelper.save(String(newValue), for: BirthKeys.hour) }
     }
 
-    private var _birthMinute: Int = UserDefaults.standard.integer(forKey: "birthMinute")
+    private var _birthMinute: Int = {
+        if let raw = KeychainHelper.load(for: BirthKeys.minute), let val = Int(raw) { return val }
+        return 0
+    }()
+
     var birthMinute: Int {
         get { _birthMinute }
-        set { _birthMinute = newValue; UserDefaults.standard.set(newValue, forKey: "birthMinute") }
+        set { _birthMinute = newValue; KeychainHelper.save(String(newValue), for: BirthKeys.minute) }
     }
 
-    private var _birthTimeKnown: Bool = UserDefaults.standard.bool(forKey: "birthTimeKnown")
+    private var _birthTimeKnown: Bool = {
+        KeychainHelper.load(for: BirthKeys.timeKnown) == "1"
+    }()
+
     var birthTimeKnown: Bool {
         get { _birthTimeKnown }
-        set { _birthTimeKnown = newValue; UserDefaults.standard.set(newValue, forKey: "birthTimeKnown") }
+        set { _birthTimeKnown = newValue; KeychainHelper.save(newValue ? "1" : "0", for: BirthKeys.timeKnown) }
     }
 
-    private var _birthPlace: String =
-        UserDefaults.standard.string(forKey: "birthPlace") ?? ""
+    private var _birthPlace: String = {
+        KeychainHelper.load(for: BirthKeys.place) ?? ""
+    }()
 
     var birthPlace: String {
         get { _birthPlace }
-        set { _birthPlace = newValue; UserDefaults.standard.set(newValue, forKey: "birthPlace") }
+        set { _birthPlace = newValue; KeychainHelper.save(newValue, for: BirthKeys.place) }
     }
 
-    /// Cached birth chart result (persisted as JSON in UserDefaults)
+    /// Cached birth chart result (persisted as JSON in Keychain)
     private var _birthChart: BirthChart? = {
-        guard let data = UserDefaults.standard.data(forKey: "birthChart") else { return nil }
+        guard let data = KeychainHelper.loadData(for: BirthKeys.chart) else { return nil }
         return try? JSONDecoder().decode(BirthChart.self, from: data)
     }()
 
@@ -71,9 +150,9 @@ import UserNotifications
         set {
             _birthChart = newValue
             if let chart = newValue, let data = try? JSONEncoder().encode(chart) {
-                UserDefaults.standard.set(data, forKey: "birthChart")
+                KeychainHelper.saveData(data, for: BirthKeys.chart)
             } else {
-                UserDefaults.standard.removeObject(forKey: "birthChart")
+                KeychainHelper.delete(for: BirthKeys.chart)
             }
         }
     }
@@ -201,6 +280,16 @@ import UserNotifications
     var defaultPromptCategory: String {
         get { _defaultPromptCategory }
         set { _defaultPromptCategory = newValue; UserDefaults.standard.set(newValue, forKey: "defaultPromptCategory") }
+    }
+
+    // MARK: - Appearance
+
+    private var _appearanceMode: String =
+        UserDefaults.standard.string(forKey: "appearanceMode") ?? "dark"
+
+    var appearanceMode: String {
+        get { _appearanceMode }
+        set { _appearanceMode = newValue; UserDefaults.standard.set(newValue, forKey: "appearanceMode") }
     }
 
     // MARK: - Permission state (drives alert in SettingsView)

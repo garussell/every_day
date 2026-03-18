@@ -16,15 +16,6 @@ struct MeditationTimerView: View {
     @State private var vm             = MeditationViewModel()
     @State private var showJournal    = false
     @State private var isPulsing      = false
-    @State private var customMinutes  = 20
-    @State private var useCustom      = false
-    @State private var holdTimer: Timer?
-    @State private var isHolding      = false
-
-    // Setup screen state
-    @State private var breatheIn      = false
-    @State private var buttonPulse    = false
-    @State private var intention      = ""
 
     // Sync default duration and bell sound from Settings without restarting the VM
     @AppStorage("defaultMeditationDuration") private var defaultDuration = 600
@@ -36,11 +27,11 @@ struct MeditationTimerView: View {
                 CelestialBackground()
 
                 if vm.isCompleted {
-                    completionView
+                    CompletionContent(vm: vm, showJournal: $showJournal)
                 } else if vm.isRunning {
-                    timerView
+                    TimerContent(vm: vm, isPulsing: $isPulsing, modelContext: modelContext)
                 } else {
-                    setupView
+                    SetupContent(vm: vm, modelContext: modelContext)
                 }
             }
             .navigationTitle("Meditate")
@@ -76,14 +67,91 @@ struct MeditationTimerView: View {
             }
         }
     }
+}
 
-    // MARK: - Setup Screen
+// MARK: - Breathing Orb
 
-    private var setupView: some View {
+private struct BreathingOrbView: View {
+    let durationMinutes: Int
+    @State private var breatheIn = false
+
+    var body: some View {
+        ZStack {
+            // Outer glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.orbitGold.opacity(0.08),
+                            Color.orbitGold.opacity(0.02),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 40,
+                        endRadius: 120
+                    )
+                )
+                .frame(width: 240, height: 240)
+                .scaleEffect(breatheIn ? 1.12 : 0.92)
+
+            // Inner orb
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.orbitGold.opacity(0.18),
+                            Color.orbitGold.opacity(0.06),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: 70
+                    )
+                )
+                .frame(width: 140, height: 140)
+                .scaleEffect(breatheIn ? 1.08 : 0.95)
+
+            // Duration display
+            VStack(spacing: 4) {
+                Text("\(durationMinutes)")
+                    .font(.system(size: 56, weight: .ultraLight, design: .rounded))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+                Text("minutes")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.40))
+                    .kerning(1)
+                    .textCase(.uppercase)
+            }
+        }
+        .accessibilityHidden(true)
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 4.0)
+                .repeatForever(autoreverses: true)
+            ) {
+                breatheIn = true
+            }
+        }
+    }
+}
+
+// MARK: - Setup Screen
+
+private struct SetupContent: View {
+    @Bindable var vm: MeditationViewModel
+    let modelContext: ModelContext
+
+    @State private var buttonPulse    = false
+    @State private var customMinutes  = 20
+    @State private var useCustom      = false
+    @State private var intention      = ""
+
+    var body: some View {
         ScrollView {
             VStack(spacing: 36) {
 
-                // ── Stats row (refined frosted glass) ────────────────────
+                // ── Stats row ────────────────────────────────────
                 HStack(spacing: 0) {
                     setupStatPill(label: "Sessions",  value: "\(vm.totalSessions)")
                     setupStatDivider
@@ -103,65 +171,10 @@ struct MeditationTimerView: View {
                 )
                 .padding(.horizontal, 32)
 
-                // ── Breathing orb ────────────────────────────────────────
-                ZStack {
-                    // Outer glow
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.orbitGold.opacity(0.08),
-                                    Color.orbitGold.opacity(0.02),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 40,
-                                endRadius: 120
-                            )
-                        )
-                        .frame(width: 240, height: 240)
-                        .scaleEffect(breatheIn ? 1.12 : 0.92)
+                // ── Breathing orb ────────────────────────────────
+                BreathingOrbView(durationMinutes: vm.selectedDuration / 60)
 
-                    // Inner orb
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.orbitGold.opacity(0.18),
-                                    Color.orbitGold.opacity(0.06),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: 70
-                            )
-                        )
-                        .frame(width: 140, height: 140)
-                        .scaleEffect(breatheIn ? 1.08 : 0.95)
-
-                    // Duration display
-                    VStack(spacing: 4) {
-                        Text("\(vm.selectedDuration / 60)")
-                            .font(.system(size: 56, weight: .ultraLight, design: .rounded))
-                            .foregroundStyle(.white)
-                            .monospacedDigit()
-                        Text("minutes")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.40))
-                            .kerning(1)
-                            .textCase(.uppercase)
-                    }
-                }
-                .onAppear {
-                    withAnimation(
-                        .easeInOut(duration: 4.0)
-                        .repeatForever(autoreverses: true)
-                    ) {
-                        breatheIn = true
-                    }
-                }
-
-                // ── Duration cards ───────────────────────────────────────
+                // ── Duration cards ───────────────────────────────
                 VStack(spacing: 12) {
                     sectionLabel("Duration")
 
@@ -214,7 +227,7 @@ struct MeditationTimerView: View {
                     }
                 }
 
-                // ── Sound selector (icon buttons) ────────────────────────
+                // ── Sound selector ───────────────────────────────
                 VStack(spacing: 12) {
                     sectionLabel("Sound")
 
@@ -229,7 +242,7 @@ struct MeditationTimerView: View {
                     .padding(.horizontal, 24)
                 }
 
-                // ── Intention field ──────────────────────────────────────
+                // ── Intention field ──────────────────────────────
                 VStack(spacing: 8) {
                     TextField("Set an intention (optional)", text: $intention)
                         .font(.subheadline)
@@ -253,7 +266,7 @@ struct MeditationTimerView: View {
                 }
                 .padding(.horizontal, 24)
 
-                // ── Begin Session button (pulsing) ───────────────────────
+                // ── Begin Session button ─────────────────────────
                 Button {
                     vm.start(in: modelContext)
                 } label: {
@@ -298,12 +311,117 @@ struct MeditationTimerView: View {
         }
     }
 
-    // MARK: - Timer Screen
+    // MARK: - Setup Helpers
 
-    private var timerView: some View {
+    private var setupStatDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.08))
+            .frame(width: 0.5, height: 28)
+    }
+
+    private func setupStatPill(label: String, value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white.opacity(0.35))
+                .textCase(.uppercase)
+                .kerning(0.3)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Color.orbitGold.opacity(0.8))
+            .textCase(.uppercase)
+            .kerning(0.5)
+            .padding(.horizontal, 20)
+    }
+
+    private func durationCard(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .black : .white.opacity(0.70))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(isSelected ? Color.orbitGold : Color.white.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(
+                                    isSelected ? Color.orbitGold.opacity(0.6) : Color.white.opacity(0.08),
+                                    lineWidth: isSelected ? 1.5 : 0.5
+                                )
+                        )
+                )
+                .scaleEffect(isSelected ? 1.04 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label) duration")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+
+    private func soundIconButton(sound: BellSound, isSelected: Bool) -> some View {
+        Button {
+            vm.selectBellSound(sound)
+        } label: {
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? Color.orbitGold.opacity(0.15) : Color.white.opacity(0.04))
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    isSelected ? Color.orbitGold : Color.white.opacity(0.08),
+                                    lineWidth: isSelected ? 1.5 : 0.5
+                                )
+                        )
+
+                    Image(systemName: sound.sfSymbol)
+                        .font(.system(size: 18))
+                        .foregroundStyle(isSelected ? Color.orbitGold : .white.opacity(0.50))
+                }
+
+                if isSelected {
+                    Text(sound.label)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color.orbitGold.opacity(0.85))
+                        .kerning(0.2)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(sound.label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+// MARK: - Timer Screen
+
+private struct TimerContent: View {
+    @Bindable var vm: MeditationViewModel
+    @Binding var isPulsing: Bool
+    let modelContext: ModelContext
+
+    @State private var holdTimer: Timer?
+    @State private var isHolding = false
+
+    var body: some View {
         VStack(spacing: 32) {
 
-            // ── Circular progress ring ─────────────────────────────────────
+            // ── Circular progress ring ───────────────────────────
             ZStack {
                 // Outer pulse glow
                 Circle()
@@ -367,7 +485,7 @@ struct MeditationTimerView: View {
             .onAppear { isPulsing = true }
             .onDisappear { isPulsing = false }
 
-            // ── Time adjustment ────────────────────────────────────────────
+            // ── Time adjustment ──────────────────────────────────
             HStack(spacing: 10) {
                 timeAdjustButton(delta: -300, label: "−5m")
                 timeAdjustButton(delta: -60,  label: "−1m")
@@ -375,7 +493,7 @@ struct MeditationTimerView: View {
                 timeAdjustButton(delta: +300, label: "+5m")
             }
 
-            // ── Controls ───────────────────────────────────────────────────
+            // ── Controls ─────────────────────────────────────────
             HStack(spacing: 24) {
                 // Stop
                 Button {
@@ -389,6 +507,7 @@ struct MeditationTimerView: View {
                         .background(Circle().fill(Color.white.opacity(0.08)))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Stop meditation")
 
                 // Pause / Resume
                 Button {
@@ -411,6 +530,7 @@ struct MeditationTimerView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(vm.isPaused ? "Resume meditation" : "Pause meditation")
 
                 // Spacer to balance the stop button on the left
                 Color.clear
@@ -424,9 +544,51 @@ struct MeditationTimerView: View {
         }
     }
 
-    // MARK: - Completion Screen
+    /// A tap-and-hold time adjustment button.
+    /// Single tap applies delta once; holding repeats at 0.2 s intervals.
+    private func timeAdjustButton(delta: Int, label: String) -> some View {
+        Text(label)
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(width: 54, height: 34)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+            )
+            .contentShape(Rectangle())
+            .accessibilityLabel("Adjust time \(label)")
+            .accessibilityAddTraits(.isButton)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isHolding else { return }
+                        isHolding = true
+                        vm.adjustTime(by: delta)
+                        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+                            vm.adjustTime(by: delta)
+                        }
+                        RunLoop.main.add(holdTimer!, forMode: .common)
+                    }
+                    .onEnded { _ in
+                        isHolding = false
+                        holdTimer?.invalidate()
+                        holdTimer = nil
+                    }
+            )
+    }
+}
 
-    private var completionView: some View {
+// MARK: - Completion Screen
+
+private struct CompletionContent: View {
+    @Bindable var vm: MeditationViewModel
+    @Binding var showJournal: Bool
+
+    var body: some View {
         VStack(spacing: 32) {
             // Celebration icon
             ZStack {
@@ -437,6 +599,7 @@ struct MeditationTimerView: View {
                     .font(.system(size: 64))
                     .foregroundStyle(Color.orbitGold)
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 8) {
                 Text("Session Complete")
@@ -512,17 +675,6 @@ struct MeditationTimerView: View {
         .padding(.vertical, 40)
     }
 
-    // MARK: - Reusable Subviews
-
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(Color.orbitGold.opacity(0.8))
-            .textCase(.uppercase)
-            .kerning(0.5)
-            .padding(.horizontal, 20)
-    }
-
     private func statPill(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
@@ -535,123 +687,4 @@ struct MeditationTimerView: View {
         }
         .frame(maxWidth: .infinity)
     }
-
-    /// A tap-and-hold time adjustment button.
-    /// Single tap applies delta once; holding repeats at 0.2 s intervals.
-    private func timeAdjustButton(delta: Int, label: String) -> some View {
-        Text(label)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.7))
-            .frame(width: 54, height: 34)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-            )
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        guard !isHolding else { return }
-                        isHolding = true
-                        vm.adjustTime(by: delta)
-                        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
-                            vm.adjustTime(by: delta)
-                        }
-                        RunLoop.main.add(holdTimer!, forMode: .common)
-                    }
-                    .onEnded { _ in
-                        isHolding = false
-                        holdTimer?.invalidate()
-                        holdTimer = nil
-                    }
-            )
-    }
-
-    // MARK: - Setup Helpers
-
-    private var setupStatDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .frame(width: 0.5, height: 28)
-    }
-
-    private func setupStatPill(label: String, value: String) -> some View {
-        VStack(spacing: 3) {
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .monospacedDigit()
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white.opacity(0.35))
-                .textCase(.uppercase)
-                .kerning(0.3)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func durationCard(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .black : .white.opacity(0.70))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isSelected ? Color.orbitGold : Color.white.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(
-                                    isSelected ? Color.orbitGold.opacity(0.6) : Color.white.opacity(0.08),
-                                    lineWidth: isSelected ? 1.5 : 0.5
-                                )
-                        )
-                )
-                .scaleEffect(isSelected ? 1.04 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-    }
-
-    private func soundIconButton(sound: BellSound, isSelected: Bool) -> some View {
-        Button {
-            vm.selectBellSound(sound)
-        } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? Color.orbitGold.opacity(0.15) : Color.white.opacity(0.04))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    isSelected ? Color.orbitGold : Color.white.opacity(0.08),
-                                    lineWidth: isSelected ? 1.5 : 0.5
-                                )
-                        )
-
-                    Image(systemName: sound.sfSymbol)
-                        .font(.system(size: 18))
-                        .foregroundStyle(isSelected ? Color.orbitGold : .white.opacity(0.50))
-                }
-
-                if isSelected {
-                    Text(sound.label)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(Color.orbitGold.opacity(0.85))
-                        .kerning(0.2)
-                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
-    }
-
 }

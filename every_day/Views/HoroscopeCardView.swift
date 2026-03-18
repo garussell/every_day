@@ -58,6 +58,7 @@ struct HoroscopeCardView: View {
             Image(systemName: "sparkles")
                 .font(.title3)
                 .foregroundStyle(Color.orbitGold)
+                .accessibilityHidden(true)
             Text(hasBirthChart ? "Your Horoscopes" : "Daily Horoscope")
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -96,6 +97,8 @@ struct HoroscopeCardView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(type.rawValue) horoscope")
+                .accessibilityAddTraits(viewModel.selectedHoroscopeType == type ? .isSelected : [])
             }
         }
         .padding(4)
@@ -116,6 +119,7 @@ struct HoroscopeCardView: View {
                 HStack(spacing: 10) {
                     Text(sign.glyph)
                         .font(.title2)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(viewModel.selectedHoroscopeType.rawValue) in \(sign.displayName)")
                             .font(.subheadline.weight(.semibold))
@@ -162,6 +166,7 @@ struct HoroscopeCardView: View {
             HStack(spacing: 10) {
                 Text(viewModel.selectedSign.glyph)
                     .font(.title2)
+                    .accessibilityHidden(true)
                 Text(viewModel.selectedSign.displayName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
@@ -172,6 +177,7 @@ struct HoroscopeCardView: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(Color.orbitGold.opacity(0.7))
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -184,6 +190,8 @@ struct HoroscopeCardView: View {
                     )
             )
         }
+        .accessibilityLabel("Change zodiac sign. Current: \(viewModel.selectedSign.displayName)")
+        .accessibilityHint("Opens zodiac sign picker")
     }
 
     @ViewBuilder
@@ -209,6 +217,7 @@ struct HoroscopeCardView: View {
                 Image(systemName: "star.circle")
                     .font(.title3)
                     .foregroundStyle(Color.orbitGold.opacity(0.7))
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Unlock Your Full Chart")
@@ -245,6 +254,7 @@ struct HoroscopeCardView: View {
     private func errorView(message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                .accessibilityHidden(true)
             Text(message).font(.footnote).foregroundStyle(.white.opacity(0.7))
         }
         .padding(.vertical, 8)

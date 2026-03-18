@@ -5,11 +5,11 @@
 
 import Foundation
 
-struct SkyPositionsResponse: Decodable {
+nonisolated struct SkyPositionsResponse: Codable, Sendable {
     let positions: [SkyPositionPayload]
 }
 
-struct SkyPositionPayload: Decodable {
+nonisolated struct SkyPositionPayload: Codable, Sendable {
     let name: String
     let rightAscension: String?
     let declination: String?
@@ -35,7 +35,7 @@ struct SkyPositionPayload: Decodable {
     }
 }
 
-struct SkyPositionObservation: Hashable {
+nonisolated struct SkyPositionObservation: Codable, Hashable, Sendable {
     let sourceName: String
     let rightAscensionText: String?
     let declinationText: String?
@@ -90,7 +90,7 @@ struct SkyPositionObservation: Hashable {
     }
 }
 
-enum SkyObjectKind: String, CaseIterable, Hashable {
+nonisolated enum SkyObjectKind: String, CaseIterable, Hashable {
     case sun
     case moon
     case mercury
@@ -163,7 +163,7 @@ enum SkyObjectKind: String, CaseIterable, Hashable {
     }
 }
 
-enum SkyViewingQuality: String, Hashable {
+nonisolated enum SkyViewingQuality: String, Hashable {
     case excellent
     case moderate
     case poor
@@ -204,7 +204,7 @@ enum SkyViewingQuality: String, Hashable {
     }
 }
 
-enum CompassDirection: String, Hashable {
+nonisolated enum CompassDirection: String, Hashable {
     case north = "N"
     case northEast = "NE"
     case east = "E"

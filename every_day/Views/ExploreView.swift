@@ -11,6 +11,8 @@ struct ExploreView: View {
 
     @State private var viewModel = ExploreViewModel()
     @State private var appeared = false
+    @State private var isHazardousExpanded = true
+    @State private var isNonHazardousExpanded = false
 
     var body: some View {
         NavigationStack {
@@ -59,7 +61,7 @@ struct ExploreView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 SpaceSectionHeader(
                                     title: "Near-Earth Objects",
-                                    subtitle: "Upcoming close approaches, formatted for a quick human scan."
+                                    subtitle: "Upcoming close approaches at a glance."
                                 )
 
                                 if viewModel.isLoadingAsteroids && viewModel.asteroids.isEmpty {
@@ -67,11 +69,7 @@ struct ExploreView: View {
                                         .tint(Color.orbitGold)
                                         .foregroundStyle(.white.opacity(0.72))
                                 } else if !viewModel.asteroids.isEmpty {
-                                    VStack(spacing: 14) {
-                                        ForEach(viewModel.asteroids) { asteroid in
-                                            AsteroidCardView(asteroid: asteroid)
-                                        }
-                                    }
+                                    asteroidGroups
                                 } else if let asteroidError = viewModel.asteroidError {
                                     Text(asteroidError)
                                         .font(.subheadline)
@@ -100,6 +98,19 @@ struct ExploreView: View {
             await viewModel.loadIfNeeded()
             withAnimation(.spring(dampingFraction: 0.8)) {
                 appeared = true
+            }
+        }
+        .onChange(of: viewModel.asteroids) { _, asteroids in
+            guard !asteroids.isEmpty else { return }
+
+            if hazardousAsteroids.isEmpty {
+                isHazardousExpanded = false
+                isNonHazardousExpanded = true
+            } else {
+                isHazardousExpanded = true
+                if nonHazardousAsteroids.isEmpty {
+                    isNonHazardousExpanded = false
+                }
             }
         }
     }
@@ -133,6 +144,88 @@ struct ExploreView: View {
 
     private var contentSpacing: CGFloat {
         isPhonePortraitLayout ? 18 : 22
+    }
+
+    private var hazardousAsteroids: [AsteroidApproach] {
+        viewModel.asteroids.filter(\.isPotentiallyHazardous)
+    }
+
+    private var nonHazardousAsteroids: [AsteroidApproach] {
+        viewModel.asteroids.filter { !$0.isPotentiallyHazardous }
+    }
+
+    @ViewBuilder
+    private var asteroidGroups: some View {
+        VStack(spacing: 12) {
+            if !hazardousAsteroids.isEmpty {
+                asteroidGroup(
+                    title: "Potentially Hazardous",
+                    count: hazardousAsteroids.count,
+                    tint: Color.red.opacity(0.9),
+                    isExpanded: $isHazardousExpanded,
+                    asteroids: hazardousAsteroids
+                )
+            }
+
+            if !nonHazardousAsteroids.isEmpty {
+                asteroidGroup(
+                    title: "Not Currently Hazardous",
+                    count: nonHazardousAsteroids.count,
+                    tint: Color.orbitGold.opacity(0.9),
+                    isExpanded: $isNonHazardousExpanded,
+                    asteroids: nonHazardousAsteroids
+                )
+            }
+        }
+    }
+
+    private func asteroidGroup(
+        title: String,
+        count: Int,
+        tint: Color,
+        isExpanded: Binding<Bool>,
+        asteroids: [AsteroidApproach]
+    ) -> some View {
+        DisclosureGroup(isExpanded: isExpanded) {
+            VStack(spacing: 12) {
+                ForEach(asteroids) { asteroid in
+                    AsteroidCardView(asteroid: asteroid)
+                }
+            }
+            .padding(.top, 14)
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 10, height: 10)
+                    .accessibilityHidden(true)
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                Spacer(minLength: 12)
+
+                Text("\(count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+            }
+            .contentShape(Rectangle())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color.orbitCard.opacity(0.6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .tint(.white.opacity(0.85))
     }
 }
 

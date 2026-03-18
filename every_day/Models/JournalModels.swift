@@ -397,3 +397,41 @@ final class JournalEntry {
         createdAt.formatted(date: .abbreviated, time: .shortened)
     }
 }
+
+// MARK: - EnergyLevel
+
+enum EnergyLevel: Int, CaseIterable {
+    case exhausted = 1
+    case low       = 2
+    case moderate  = 3
+    case high      = 4
+    case energized = 5
+
+    var label: String {
+        switch self {
+        case .exhausted: return "Exhausted"
+        case .low:       return "Low"
+        case .moderate:  return "Moderate"
+        case .high:      return "High"
+        case .energized: return "Energized"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .exhausted: return Color(red: 0.45, green: 0.45, blue: 0.75)
+        case .low:       return Color(red: 0.55, green: 0.50, blue: 0.80)
+        case .moderate:  return Color(red: 0.75, green: 0.55, blue: 0.75)
+        case .high:      return Color(red: 0.90, green: 0.55, blue: 0.60)
+        case .energized: return JournalEntryType.mood.color
+        }
+    }
+
+    static func color(for value: Int) -> Color {
+        (EnergyLevel(rawValue: value) ?? .moderate).color
+    }
+
+    static func label(for value: Int) -> String {
+        (EnergyLevel(rawValue: value) ?? .moderate).label
+    }
+}

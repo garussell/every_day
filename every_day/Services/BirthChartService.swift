@@ -15,6 +15,7 @@
 
 import Foundation
 import CoreLocation
+import SwiftUI
 
 // MARK: - Planet Data Model
 
@@ -28,6 +29,77 @@ struct PlanetData: Codable, Equatable {
     let absPos: Double      // absolute ecliptic longitude
     let retrograde: Bool
     let house: Int          // 1–12 (0 if unavailable)
+}
+
+// MARK: - Planet Metadata
+
+/// Glyph, color, and description for each planet in a natal chart.
+enum PlanetMetadata {
+    static func symbol(for id: String) -> String {
+        switch id {
+        case "sun":                                return "☉"
+        case "moon":                               return "☽"
+        case "mercury":                            return "☿"
+        case "venus":                              return "♀"
+        case "mars":                               return "♂"
+        case "jupiter":                            return "♃"
+        case "saturn":                             return "♄"
+        case "uranus":                             return "♅"
+        case "neptune":                            return "♆"
+        case "pluto":                              return "♇"
+        case "mean_node","true_node","north_node": return "☊"
+        default:                                   return "✦"
+        }
+    }
+
+    static func color(for id: String) -> Color {
+        switch id {
+        case "sun":                                return Color.orbitGold
+        case "moon":                               return .white.opacity(0.85)
+        case "mercury":                            return Color(red: 0.70, green: 0.70, blue: 0.82)
+        case "venus":                              return Color(red: 0.92, green: 0.60, blue: 0.68)
+        case "mars":                               return Color(red: 0.90, green: 0.40, blue: 0.35)
+        case "jupiter":                            return Color(red: 0.82, green: 0.70, blue: 0.50)
+        case "saturn":                             return Color(red: 0.66, green: 0.66, blue: 0.76)
+        case "uranus":                             return Color(red: 0.40, green: 0.80, blue: 0.90)
+        case "neptune":                            return Color(red: 0.40, green: 0.52, blue: 0.92)
+        case "pluto":                              return Color(red: 0.76, green: 0.42, blue: 0.82)
+        case "mean_node","true_node","north_node": return Color(red: 0.55, green: 0.80, blue: 0.50)
+        default:                                   return .white.opacity(0.7)
+        }
+    }
+
+    static func description(for id: String) -> String {
+        switch id {
+        case "sun":                                return "Core identity and ego"
+        case "moon":                               return "Emotions and inner self"
+        case "mercury":                            return "Communication and thinking"
+        case "venus":                              return "Love, beauty, and values"
+        case "mars":                               return "Drive, action, and desire"
+        case "jupiter":                            return "Growth, luck, and expansion"
+        case "saturn":                             return "Structure, discipline, and karma"
+        case "uranus":                             return "Change, rebellion, and innovation"
+        case "neptune":                            return "Dreams, intuition, and spirituality"
+        case "pluto":                              return "Transformation and power"
+        case "mean_node","true_node","north_node": return "Life purpose and destiny"
+        default:                                   return ""
+        }
+    }
+
+    static func elementColor(for signId: String) -> Color {
+        switch signId.lowercased() {
+        case "aries", "leo", "sagittarius":
+            return Color(red: 0.95, green: 0.65, blue: 0.25)
+        case "taurus", "virgo", "capricorn":
+            return Color(red: 0.55, green: 0.80, blue: 0.50)
+        case "gemini", "libra", "aquarius":
+            return Color(red: 0.45, green: 0.75, blue: 0.95)
+        case "cancer", "scorpio", "pisces":
+            return Color(red: 0.35, green: 0.68, blue: 0.82)
+        default:
+            return .white.opacity(0.75)
+        }
+    }
 }
 
 // MARK: - House Cusp Model

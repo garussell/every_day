@@ -5,11 +5,11 @@
 
 import Foundation
 
-struct SolarSystemBodiesResponse: Decodable {
+nonisolated struct SolarSystemBodiesResponse: Codable, Sendable {
     let bodies: [SolarSystemBodyResponse]
 }
 
-struct SolarSystemBodyResponse: Decodable {
+nonisolated struct SolarSystemBodyResponse: Codable, Sendable {
     let id: String
     let name: String
     let englishName: String
@@ -26,7 +26,7 @@ struct SolarSystemBodyResponse: Decodable {
     let discoveryDate: String?
 }
 
-struct SolarSystemMoonResponse: Decodable {
+nonisolated struct SolarSystemMoonResponse: Codable, Sendable {
     let moon: String?
     let rel: String?
 }

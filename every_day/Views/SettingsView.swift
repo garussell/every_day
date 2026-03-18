@@ -47,6 +47,7 @@ struct SettingsView: View {
                     notificationsSection
                     meditationSection
                     journalSection
+                    appearanceSection
                     dataPrivacySection
                     aboutSection
                 }
@@ -247,6 +248,7 @@ struct SettingsView: View {
                 if let sunSign = ZodiacSign(fromName: chart.sunSign) {
                     Text(sunSign.glyph)
                         .font(.title2)
+                        .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Sun Sign")
@@ -264,6 +266,7 @@ struct SettingsView: View {
                 if let moonSign = ZodiacSign(fromName: chart.moonSign) {
                     Text(moonSign.glyph)
                         .font(.title2)
+                        .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Moon Sign")
@@ -282,6 +285,7 @@ struct SettingsView: View {
                     if let risingSign = ZodiacSign(fromName: rising) {
                         Text(risingSign.glyph)
                             .font(.title2)
+                            .accessibilityHidden(true)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Rising Sign")
@@ -298,7 +302,6 @@ struct SettingsView: View {
             // View full birth chart
             NavigationLink {
                 BirthChartDetailView(chart: chart)
-                    .preferredColorScheme(.dark)
             } label: {
                 Label("View Full Birth Chart", systemImage: "star.circle.fill")
                     .foregroundStyle(Color.orbitGold)
@@ -331,6 +334,7 @@ struct SettingsView: View {
                         HStack(spacing: 14) {
                             Text(sign.glyph)
                                 .font(.title2)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(sign.displayName)
                                     .font(.body)
@@ -485,6 +489,26 @@ struct SettingsView: View {
         .listRowBackground(rowBackground)
     }
 
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        Section {
+            Picker(selection: Binding(
+                get: { settingsVM.appearanceMode },
+                set: { settingsVM.appearanceMode = $0 }
+            )) {
+                Text("Always Dark").tag("dark")
+                Text("System").tag("system")
+            } label: {
+                Label("Appearance", systemImage: "circle.lefthalf.filled")
+                    .foregroundStyle(.white)
+            }
+        } header: {
+            sectionHeader("Appearance")
+        }
+        .listRowBackground(rowBackground)
+    }
+
     // MARK: - Data & Privacy
 
     private var dataPrivacySection: some View {
@@ -570,6 +594,7 @@ struct SettingsView: View {
                 Image(systemName: "star.circle.fill")
                     .foregroundStyle(Color.orbitGold)
                     .font(.title3)
+                    .accessibilityHidden(true)
                 Text("Your daily guide through celestial rhythms — weather, moon phases, horoscopes, journaling, and meditation, all in one place.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.55))

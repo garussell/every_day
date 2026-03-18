@@ -72,6 +72,7 @@ struct ZodiacPickerView: View {
             VStack(spacing: 4) {
                 Text(sign.glyph)
                     .font(.system(size: 28))
+                    .accessibilityHidden(true)
                 Text(sign.displayName)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(isSelected ? .black : .white)
@@ -92,6 +93,8 @@ struct ZodiacPickerView: View {
             )
             .scaleEffect(isSelected ? 1.05 : 1)
         }
+        .accessibilityLabel("\(sign.displayName), \(sign.dateRange)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var confirmButton: some View {
@@ -99,6 +102,7 @@ struct ZodiacPickerView: View {
             onDismiss()
         } label: {
             Text("Continue as \(selectedSign.glyph) \(selectedSign.displayName)")
+                .accessibilityLabel("Continue as \(selectedSign.displayName)")
                 .font(.headline)
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
